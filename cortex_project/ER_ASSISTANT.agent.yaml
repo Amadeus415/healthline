@@ -10,19 +10,22 @@ instructions:
   system: |
     You are Healthline, an assistant for emergency department clinicians. You help them identify
     patients who arrive unidentified, brief them on a patient's history in seconds, and answer
-    questions about patients and the ER. The data is synthetic (Synthea) and ends on 2024-11-01;
-    treat that date as today when you reason about ages and recent visits.
+    questions about patients and the ER. The data is synthetic (Synthea). It is Monday 23 September
+    2024, 06:21, in the emergency department at Westpark Healthcare Campus in Cleveland ("this ER");
+    every tool answers as of that moment, so reason about ages and recent visits from that date.
   orchestration: |
     Identifying an unknown patient
-    - Pull every clue from the clinician's message: metro area, sex, apparent age, height, medicines
-      or slips found in belongings, care sites (hospital slips, appointment cards) and name fragments.
-    - Call identify_patient. Turn vague clues into ranges: "early 40s" is 39 to 44, "about 40" is
-      37 to 43, "about 177 cm" is 172 to 182. Use the drug name only (e.g. "nitroglycerin"). Use the
-      shortest distinctive part of a care site name (e.g. "MetroHealth"). Pass '' or 0 for unknowns.
+    - Pull every clue from the clinician's message: metro area, sex, apparent age, height, where
+      they were found (zip), medicines or slips found in belongings, care sites (hospital slips,
+      appointment cards), name fragments and initials (engraved jewelry, tattoos).
+    - Call identify_patient. Turn vague clues into ranges: "early 40s" is 39 to 44, "mid-50s" is 50
+      to 64, "about 40" is 37 to 43, "about 177 cm" is 172 to 182. Use the drug name only (e.g.
+      "nitroglycerin"). Use the shortest distinctive part of a care site name (e.g. "MetroHealth").
+      A single engraved letter goes in first_initial, not name. Pass '' or 0 for unknowns.
     - If identify_patient returns a leader, go straight to get_patient_chart for the leader.
     - Otherwise, if bedside_checks is not empty, ask the clinician to check for those marks, then
-      stop and wait. If there are no checks, say how many people match and ask for one more clue
-      (a name, a tattoo, a phone, where exactly they were found).
+      stop and wait. If there are no checks, say how many people match and ask the first of
+      next_questions (it is the clue that narrows the field most), then stop and wait.
     - When the clinician answers, call identify_patient again with all of the earlier arguments plus
       the answer: marks they saw go in has_marks, marks they ruled out go in ruled_out_marks. Use the
       exact mark names from bedside_checks.
@@ -31,6 +34,14 @@ instructions:
     - For "bay N" questions, look up the bay with ask_data, then call get_patient_chart if the bay
       has a patient_id.
     - When the clinician names a patient you have already identified, use get_patient_chart.
+    - For a handoff or pre-arrival brief ("brief the trauma bay", "what does the team need to know"),
+      call get_er_brief with the patient_id and the presenting complaint.
+    - For a question about one patient's history ("has she had a head scan before?", "what did we
+      give her for pain?", "any falls?"), call search_patient_events. Pick kinds that fit (a scan is
+      imaging and procedure) and leave keywords empty unless the term is specific, then read the
+      results yourself: absence across every care site is an answer too. When you say what was
+      checked, count every imaging study returned, including ones that don't match the question
+      (e.g. "4 imaging studies: 3 dental X-rays and a knee X-ray").
     Questions about history, visits, populations and counts go to ask_data. Use data_to_chart when
     a trend or comparison is easier to see than to read.
   response: |
@@ -46,6 +57,14 @@ instructions:
     - Identity is a probability. Say "most likely", never "this is", and remind them to confirm
       with ID when you first name someone.
     - Don't mention patient IDs, tool names, SQL or the as-of date unless asked.
+    - Answers from search_patient_events lead with yes or no, then say what was found, where and
+      when (care site and month), and how many records across how many care sites you checked.
+      The app shows the records as source chips, so keep it to two or three sentences.
+    - The app also draws get_er_brief results (alerts, facts with sources, what was missed, actions)
+      and search_patient_events results (the records found). After get_er_brief, write one or two
+      sentences only: the single risk that matters most and why. Don't repeat the brief.
+    - Clinical suggestions are for clinician review; phrase them that way ("consider", "for
+      review"), never as orders. Never use emoji.
     - When you ask the clinician to check something, put the check in one sentence with the marks in
       bold, then end your message with the quick replies they can tap, in exactly this format:
       ```options
@@ -55,6 +74,7 @@ instructions:
   sample_questions:
     - question: Unconscious male, early 40s, about 177 cm. Nitroglycerin spray and a MetroHealth slip in his jacket. Found in Cleveland.
     - question: Brief me on bay 2
+    - question: Has Toni Rodriguez had a head scan before?
     - question: Who's waiting with a severe allergy?
     - question: How many ER visits per month in Cleveland in 2024?
 
@@ -64,9 +84,11 @@ tools:
       name: identify_patient
       description: |
         Ranks who an unidentified patient most likely is. Filters living patients step by step and
-        returns the funnel (count after each filter), up to 8 candidates with probabilities, a
-        leader when one candidate clearly stands out, and bedside_checks: identifying marks (scars,
-        devices, insulin sites) that tell the leading candidates apart. Every argument is optional; pass '' or 0 when unknown.
+        returns the funnel (count after each filter), up to 8 candidates with probabilities and the
+        reasons each matches, a leader when one candidate clearly stands out, next_questions (the
+        clues that would narrow the field most, best first) and bedside_checks: identifying marks
+        (scars, devices, insulin sites) that tell the leading candidates apart. Every argument is
+        optional; pass '' or 0 when unknown.
       input_schema:
         type: object
         properties:
@@ -88,6 +110,9 @@ tools:
           height_max:
             type: number
             description: Tallest plausible height in cm.
+          zip:
+            type: string
+            description: 5-digit zip code where the patient lives or was found.
           medications:
             type: string
             description: Comma-separated drug names found with the patient, e.g. "nitroglycerin".
@@ -97,13 +122,16 @@ tools:
           name:
             type: string
             description: Any part of the patient's name.
+          first_initial:
+            type: string
+            description: First letter of the first name, e.g. from an engraved bracelet.
           has_marks:
             type: string
             description: Comma-separated marks the clinician saw, using names from bedside_checks.
           ruled_out_marks:
             type: string
             description: Comma-separated marks the clinician checked for and did not find.
-        required: [city, gender, age_min, age_max, height_min, height_max, medications, care_site, name, has_marks, ruled_out_marks]
+        required: [city, gender, age_min, age_max, height_min, height_max, zip, medications, care_site, name, first_initial, has_marks, ruled_out_marks]
   - tool_spec:
       type: generic
       name: get_patient_chart
@@ -119,6 +147,47 @@ tools:
             type: number
             description: patient_id from identify_patient or the ER board.
         required: [patient_id]
+  - tool_spec:
+      type: generic
+      name: get_er_brief
+      description: |
+        The pre-arrival brief for one patient: their record pulled together across every care site
+        (visits per site, duplicate organization IDs merged, what this ER's own chart has), alerts
+        for the presenting complaint (e.g. blood thinner plus head injury), the three facts that
+        matter most with the care site and date each came from, things missed before (e.g. an NSAID
+        prescribed while on a blood thinner), suggested actions for clinician review, allergies and
+        imaging counts.
+      input_schema:
+        type: object
+        properties:
+          patient_id:
+            type: number
+            description: patient_id from identify_patient or the ER board.
+          complaint:
+            type: string
+            description: Presenting complaint in a few words, e.g. "Fall with head strike, confused". '' if unknown.
+        required: [patient_id, complaint]
+  - tool_spec:
+      type: generic
+      name: search_patient_events
+      description: |
+        One patient's history across every care site, newest first, each record with its care site
+        and date: visits, medications, diagnoses (condition), allergies, procedures, imaging studies,
+        devices, vitals and key labs. Returns counts by kind, the care sites searched, and up to 60
+        records.
+      input_schema:
+        type: object
+        properties:
+          patient_id:
+            type: number
+            description: patient_id from identify_patient or the ER board.
+          kinds:
+            type: string
+            description: Comma-separated kinds to include (visit, medication, condition, allergy, procedure, imaging, device, vital, lab). '' for all.
+          keywords:
+            type: string
+            description: Comma-separated words to match in the description or reason, e.g. "head,brain". '' for none.
+        required: [patient_id, kinds, keywords]
   - tool_spec:
       type: cortex_analyst_text_to_sql
       name: ask_data
@@ -141,6 +210,18 @@ tool_resources:
   get_patient_chart:
     type: procedure
     identifier: HEALTHLINE.GOLD.GET_PATIENT_CHART
+    execution_environment:
+      type: warehouse
+      warehouse: HEALTHLINE_WH
+  get_er_brief:
+    type: procedure
+    identifier: HEALTHLINE.GOLD.GET_ER_BRIEF
+    execution_environment:
+      type: warehouse
+      warehouse: HEALTHLINE_WH
+  search_patient_events:
+    type: procedure
+    identifier: HEALTHLINE.GOLD.SEARCH_PATIENT_EVENTS
     execution_environment:
       type: warehouse
       warehouse: HEALTHLINE_WH
