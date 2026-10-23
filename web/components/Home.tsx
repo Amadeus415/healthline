@@ -5,21 +5,13 @@ import { ArrowRight } from "lucide-react";
 import { forwardRef } from "react";
 import { Composer, type ComposerHandle } from "./Composer";
 import { Mark } from "./Mark";
+import type { Persona } from "@/lib/personas";
 
 const ease = [0.2, 0.7, 0.2, 1] as const;
 
-export const BAY4_STORY =
-  "Unconscious male, early 40s, about 177 cm. Nitroglycerin spray and a MetroHealth slip in his jacket. Found in Cleveland.";
+type Props = { bay?: number; suggestions: Persona["suggestions"]; onSend: (text: string) => void };
 
-const SUGGESTIONS = [
-  { label: "Unconscious male, early 40s, nitroglycerin spray", prompt: BAY4_STORY },
-  { label: "Brief me on bay 2", prompt: "Brief me on bay 2" },
-  { label: "Who’s waiting with a severe allergy?", prompt: "Who's waiting with a severe allergy?" },
-];
-
-type Props = { bay?: number; onSend: (text: string) => void };
-
-export const Home = forwardRef<ComposerHandle, Props>(function Home({ bay, onSend }, ref) {
+export const Home = forwardRef<ComposerHandle, Props>(function Home({ bay, suggestions, onSend }, ref) {
   return (
     <section className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-16">
       {/* A slow accent glow behind the greeting. */}
@@ -54,7 +46,7 @@ export const Home = forwardRef<ComposerHandle, Props>(function Home({ bay, onSen
       >
         <Composer ref={ref} large placeholder="Describe the patient, or ask about anyone in the ER" onSend={onSend} />
         <div className="mt-[42px] grid">
-          {SUGGESTIONS.map((s, i) => (
+          {suggestions.map((s, i) => (
             <motion.button
               key={s.label}
               initial={{ opacity: 0, y: 8 }}

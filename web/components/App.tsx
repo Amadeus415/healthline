@@ -10,12 +10,13 @@ import { PatientPanel } from "./PatientPanel";
 import { Sidebar } from "./Sidebar";
 import { Thread } from "./Thread";
 import { applyEvent, newAssistantTurn, streamAgent, toMessages, uid, type AssistantTurn, type Turn } from "@/lib/conversation";
+import { PERSONAS, solo, type PersonaId } from "@/lib/personas";
 import type { Bay } from "@/lib/types";
 
 type Case = { id: string; title: string; bay?: number; label?: string; unidentified?: boolean; turns: Turn[]; updatedAt: number };
 
 const STORE = "hl-cases";
-const CLINICIAN = "Dr. Okafor";
+const PERSONA = "hl-persona";
 
 export function useMedia(query: string) {
   return useSyncExternalStore(
@@ -41,6 +42,11 @@ export function App() {
   const [bays, setBays] = useState<Bay[]>([]);
   const [boardError, setBoardError] = useState<string>();
   const [cases, setCases] = useState<Case[]>(loadCases);
+  const [personaId, setPersonaId] = useState<PersonaId>(() => {
+    const saved = localStorage.getItem(PERSONA);
+    return saved && saved in PERSONAS ? (saved as PersonaId) : "doctor";
+  });
+  const persona = PERSONAS[personaId];
   const [activeId, setActiveId] = useState<string | null>(null);
   const [homeBay, setHomeBay] = useState<Bay>();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -76,6 +82,11 @@ export function App() {
       return next;
     });
   }, []);
+
+  const choosePersona = (id: PersonaId) => {
+    setPersonaId(id);
+    localStorage.setItem(PERSONA, id);
+  };
 
   const active = cases.find((c) => c.id === activeId) ?? null;
   const patient = useMemo(
@@ -132,7 +143,7 @@ export function App() {
       setPanelOpen(false);
     }
 
-    const user: Turn = { id: uid(), role: "user", text };
+    const user: Turn = { id: uid(), role: "user", text, sent: solo(personaId, text), persona: personaId };
     let reply = newAssistantTurn();
     const id = caseId;
     setCases((all) => all.map((c) => (c.id === id ? { ...c, updatedAt: Date.now(), turns: [...c.turns, user, reply] } : c)));
@@ -202,6 +213,8 @@ export function App() {
             cases={cases}
             activeCaseId={activeId}
             theme={theme}
+            persona={persona}
+            onPersona={choosePersona}
             onNew={newCase}
             onBay={openBay}
             onCase={(id) => {
@@ -265,7 +278,7 @@ export function App() {
             </div>
           </section>
         ) : (
-          <Home ref={homeComposer} bay={homeBay?.bay} onSend={(text) => send(text, { caseId: null, bay: homeBay && !/\bbay \d+\b/i.test(text) && !/^who|^how|^chart|^brief/i.test(text) ? homeBay : undefined })} />
+          <Home ref={homeComposer} bay={homeBay?.bay} suggestions={persona.suggestions} onSend={(text) => send(text, { caseId: null, bay: homeBay && !/\bbay \d+\b/i.test(text) && !/^who|^how|^chart|^brief/i.test(text) ? homeBay : undefined })} />
         )}
       </main>
 
@@ -280,7 +293,7 @@ export function App() {
         <div className="h-full w-[400px] overflow-y-auto max-[1220px]:w-auto">
           <AnimatePresence>
             {patient && showPanel && (
-              <PatientPanel chart={patient} identified={!!active?.unidentified} clinician={CLINICIAN} onClose={() => setPanelOpen(false)} />
+              <PatientPanel chart={patient} identified={!!active?.unidentified} clinician={persona.name} onClose={() => setPanelOpen(false)} />
             )}
           </AnimatePresence>
         </div>

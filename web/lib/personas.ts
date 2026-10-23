@@ -11,7 +11,18 @@ export type Persona = {
   where: string;
   placeholder: string;
   tint: string;
+  /** What this person needs from a reply in the single-user view. */
+  focus: string;
+  /** Home suggestions in the single-user view. */
+  suggestions: { label: string; prompt: string }[];
 };
+
+export const BAY4_STORY =
+  "Unconscious male, early 40s, about 177 cm. Nitroglycerin spray and a MetroHealth slip in his jacket. Found in Cleveland.";
+
+const BAY2 = { label: "Brief me on bay 2", prompt: "Brief me on bay 2" };
+const ALLERGY = { label: "Who’s waiting with a severe allergy?", prompt: "Who's waiting with a severe allergy?" };
+const THINNERS = { label: "Who on the board is on blood thinners?", prompt: "Who on the ER board is on a blood thinner?" };
 
 export const PERSONAS: Record<PersonaId, Persona> = {
   paramedic: {
@@ -22,6 +33,9 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     where: "Unit 12 · en route",
     placeholder: "Field report, vitals, what you found",
     tint: "#2f7de1",
+    focus:
+      "I'm in the field or en route. Lead with what changes care before arrival: who they most likely are, blood thinners, severe allergies and cardiac drugs. Be even shorter than usual.",
+    suggestions: [{ label: "Unresponsive male, early 40s, nitroglycerin spray", prompt: BAY4_STORY }, THINNERS, BAY2],
   },
   doctor: {
     id: "doctor",
@@ -31,6 +45,8 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     where: "Emergency medicine",
     placeholder: "Ask anything, or tell the nurse what to prepare",
     tint: "#ec4f2a",
+    focus: "Focus on what changes diagnosis and treatment decisions.",
+    suggestions: [{ label: "Unconscious male, early 40s, nitroglycerin spray", prompt: BAY4_STORY }, BAY2, ALLERGY],
   },
   nurse: {
     id: "nurse",
@@ -40,6 +56,8 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     where: "Resus bay 4",
     placeholder: "Ask about prep, allergies, access, meds",
     tint: "#1f9d74",
+    focus: "Focus on medications, allergies, the vitals to watch and the nursing tasks that follow. Keep to the usual length.",
+    suggestions: [BAY2, ALLERGY, THINNERS],
   },
 };
 
@@ -84,4 +102,10 @@ export function tagged(persona: PersonaId, text: string, updates: string[], firs
     `[${auto ? MONITOR : `${p.role} · ${p.name}`}] ${text}`,
   ];
   return lines.join("\n");
+}
+
+/** The single-user view: say who is asking without the team tags, which switch the agent into team mode. */
+export function solo(persona: PersonaId, text: string) {
+  const p = PERSONAS[persona];
+  return `(Asked by ${p.name}, ${p.role.toLowerCase()}, ${p.where}. ${p.focus})\n${text}`;
 }
