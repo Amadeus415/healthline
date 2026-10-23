@@ -12,7 +12,7 @@ export type Block =
   | { kind: "chart"; id: string; spec: string };
 
 /** `sent` is what the agent sees when it differs from what the user typed (team tags, protocol). */
-export type UserTurn = { id: string; role: "user"; text: string; sent?: string; persona?: PersonaId };
+export type UserTurn = { id: string; role: "user"; text: string; sent?: string; persona?: PersonaId; auto?: boolean };
 
 export type AssistantTurn = {
   id: string;
@@ -273,6 +273,8 @@ export function parseDirectives(text: string): Directives {
     })
     // While streaming, hide a block that has opened but not closed yet.
     .replace(/```(options|handoff|tasks|catches)[\s\S]*$/, "")
+    // The team tags are for the agent; drop one if it echoes it back.
+    .replace(/^\s*\[(Paramedic|Doctor|Nurse|Monitor)[^\]]*\]\s*/i, "")
     .trim();
   return out;
 }

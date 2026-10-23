@@ -11,14 +11,17 @@ import { Mark } from "./Mark";
 import { PatientPanel } from "./PatientPanel";
 import { PersonaColumn, type InboxItem } from "./PersonaColumn";
 import { ReadyList, type ReadyItem } from "./ReadyList";
+import { VitalsMonitor } from "./VitalsMonitor";
 import { applyEvent, newAssistantTurn, streamAgent, toMessages, turnDirectives, uid, type AssistantTurn, type Turn, type UserTurn } from "@/lib/conversation";
 import { FIELD_REPORT, ORDER, PERSONAS, tagged, type PersonaId } from "@/lib/personas";
+import { LAST_TICK, TICK_MS, bp, checkTriggers, vitalsAt, vitalsLine, type Vitals } from "@/lib/vitals";
 
 // One case, one agent conversation, three people. Each column shows what its persona said and what
 // Healthline said back; handoffs, tasks and catches in any reply are routed to the right column.
 
 type Note = { id: string; to: PersonaId; from: PersonaId; title: string; at: number };
 type Saved = { turns: Turn[]; done: string[]; notes: Note[]; seen: Record<PersonaId, number> };
+type Queued = { persona: PersonaId; text: string; auto?: boolean };
 
 const STORE = "hl-team";
 const EMPTY_SEEN: Record<PersonaId, number> = { paramedic: 0, doctor: 0, nurse: 0 };
@@ -67,8 +70,8 @@ export function TeamApp() {
   const [done, setDone] = useState<string[]>(initial.done);
   const [notes, setNotes] = useState<Note[]>(initial.notes);
   const [seen, setSeen] = useState(initial.seen);
-  const [queue, setQueue] = useState<{ persona: PersonaId; text: string }[]>([]);
-  const queueRef = useRef<{ persona: PersonaId; text: string }[]>([]);
+  const [queue, setQueue] = useState<Queued[]>([]);
+  const queueRef = useRef<Queued[]>([]);
   const draining = useRef(false);
   const [running, setRunning] = useState<PersonaId | null>(null);
   const [chartOpen, setChartOpen] = useState(false);
@@ -78,6 +81,35 @@ export function TeamApp() {
   const pending = useRef<string[]>([]);
   const abort = useRef<AbortController | null>(null);
   const narrow = useMedia("(max-width: 1220px)");
+
+  // The ambulance monitor: starts with the field report, alarms go to the agent like any message.
+  const [vitals, setVitals] = useState<Vitals[]>([]);
+  const [feedOn, setFeedOn] = useState(false);
+  const [fast, setFast] = useState(false);
+  const [alarms, setAlarms] = useState<string[]>([]);
+  const vitalsRef = useRef<Vitals[]>([]);
+  const fired = useRef<string[]>([]);
+  const sendRef = useRef<(q: Queued) => void>(() => {});
+
+  useEffect(() => {
+    if (!feedOn) return;
+    const timer = setInterval(() => {
+      const next = vitalsRef.current.length;
+      if (next > LAST_TICK) {
+        setFeedOn(false);
+        return;
+      }
+      const history = [...vitalsRef.current, vitalsAt(next)];
+      vitalsRef.current = history;
+      setVitals(history);
+      for (const t of checkTriggers(history, fired.current)) {
+        fired.current = [...fired.current, t.id];
+        setAlarms((a) => [...a, t.label]);
+        sendRef.current({ persona: "paramedic", text: t.message, auto: true });
+      }
+    }, fast ? TICK_MS / 3 : TICK_MS);
+    return () => clearInterval(timer);
+  }, [feedOn, fast]);
 
   useEffect(() => {
     if (!running) localStorage.setItem(STORE, JSON.stringify({ turns, done, notes, seen } satisfies Saved));
@@ -144,10 +176,13 @@ export function TeamApp() {
   }, []);
   const patch = useCallback((turn: AssistantTurn) => commit(turnsRef.current.map((t) => (t.id === turn.id ? turn : t))), [commit]);
 
-  const run = useCallback(async (persona: PersonaId, text: string) => {
+  const run = useCallback(async ({ persona, text, auto }: Queued) => {
     const prior = turnsRef.current;
     const first = !prior.some((t) => t.role === "user");
-    const user: UserTurn = { id: uid(), role: "user", persona, text, sent: tagged(persona, text, pending.current, first) };
+    // Humans' messages carry the latest monitor reading so answers use current vitals.
+    const reading = !auto && vitalsRef.current.length ? vitalsLine(vitalsRef.current) : null;
+    const updates = [...pending.current, ...(reading ? [reading] : [])];
+    const user: UserTurn = { id: uid(), role: "user", persona, text, auto, sent: tagged(persona, text, updates, first, auto) };
     pending.current = [];
     let reply: AssistantTurn = { ...newAssistantTurn(), id: `${uid()}:${Date.now()}`, replyTo: persona };
     commit([...prior, user, reply]);
@@ -182,15 +217,27 @@ export function TeamApp() {
     while (queueRef.current.length) {
       const head = queueRef.current.shift()!;
       setQueue([...queueRef.current]);
-      await run(head.persona, head.text);
+      await run(head);
     }
     draining.current = false;
   }, [run]);
 
-  const send = (persona: PersonaId, text: string) => {
-    queueRef.current.push({ persona, text });
+  const enqueue = (q: Queued) => {
+    queueRef.current.push(q);
     setQueue([...queueRef.current]);
     drain();
+  };
+  useEffect(() => {
+    sendRef.current = enqueue;
+  });
+
+  const send = (persona: PersonaId, text: string) => {
+    if (persona === "paramedic" && !vitalsRef.current.length) {
+      vitalsRef.current = [vitalsAt(0)];
+      setVitals(vitalsRef.current);
+      setFeedOn(true);
+    }
+    enqueue({ persona, text });
   };
 
   const toggleTask = (id: string) => {
@@ -208,6 +255,11 @@ export function TeamApp() {
 
   const reset = () => {
     queueRef.current = [];
+    vitalsRef.current = [];
+    fired.current = [];
+    setVitals([]);
+    setAlarms([]);
+    setFeedOn(false);
     abort.current?.abort();
     setQueue([]);
     commit([]);
@@ -255,6 +307,9 @@ export function TeamApp() {
         onStop={() => abort.current?.abort()}
         onChart={p === "doctor" && patient ? () => setChartOpen((o) => !o) : undefined}
       >
+        {p === "paramedic" && (
+          <VitalsMonitor history={vitals} running={feedOn} fast={fast} alarms={alarms} onToggle={() => setFeedOn((o) => !o)} onFast={() => setFast((f) => !f)} />
+        )}
         {p === "nurse" && <ReadyList items={routed.ready} onToggle={toggleTask} />}
         {p === "doctor" && (
           <AnimatePresence>
@@ -263,7 +318,7 @@ export function TeamApp() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-x-0 top-[62px] bottom-0 z-20 overflow-y-auto border-t border-line bg-raise"
+                className="absolute inset-x-0 top-[52px] bottom-0 z-20 overflow-y-auto border-t border-line bg-raise"
               >
                 <PatientPanel chart={patient} identified clinician={PERSONAS.doctor.name} onClose={() => setChartOpen(false)} />
               </motion.div>
@@ -276,7 +331,7 @@ export function TeamApp() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-[58px] flex-none items-center gap-4 border-b border-line px-5">
+      <header className="flex h-[50px] flex-none items-center gap-4 border-b border-line px-5">
         <Link href="/" className="flex items-center gap-2.5 font-serif text-[24px] leading-none tracking-[-.01em]">
           <Mark className="size-[20px]" />
           Healthline
@@ -294,6 +349,11 @@ export function TeamApp() {
           </AnimatePresence>
         </div>
         <div className="ml-auto flex items-center gap-1.5 text-mute">
+          {vitals.length > 0 && (
+            <span className={clsx("mr-2 font-mono text-[12px] tabular-nums", vitals.at(-1)!.sbp < 90 ? "text-accent" : "text-ink")}>
+              BP {bp(vitals.at(-1)!)} · HR {vitals.at(-1)!.hr} · SpO2 {vitals.at(-1)!.spo2}%
+            </span>
+          )}
           <span className="inline-flex items-center gap-[7px] rounded-full border border-line px-[11px] py-1.5 font-mono text-[10.5px] leading-none tracking-[.07em] whitespace-nowrap uppercase max-sm:hidden">
             <span className={clsx("size-1.5 rounded-full bg-accent", running ? "animate-[pulse-dot_0.8s_infinite]" : "animate-[pulse-dot_2s_infinite]")} />
             One Cortex Agent · 3 people

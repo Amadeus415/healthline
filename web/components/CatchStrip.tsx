@@ -20,7 +20,7 @@ export function CatchStrip({ catches }: { catches: (Catch & { id: string })[] })
   const newest = [...catches].reverse();
 
   return (
-    <div className="flex h-[52px] flex-none items-center gap-4 border-b border-line bg-side/60 px-5">
+    <div className="flex h-[44px] flex-none items-center gap-4 border-b border-line bg-side/60 px-5">
       <div className="flex flex-none items-center gap-3">
         <span className="label">Healthline caught</span>
         <div className="flex gap-1.5">
