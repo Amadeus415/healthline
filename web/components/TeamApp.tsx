@@ -14,6 +14,7 @@ import { ReadyList, type ReadyItem } from "./ReadyList";
 import { VitalsMonitor } from "./VitalsMonitor";
 import { applyEvent, newAssistantTurn, streamAgent, toMessages, turnDirectives, uid, type AssistantTurn, type Turn, type UserTurn } from "@/lib/conversation";
 import { FIELD_REPORT, ORDER, PERSONAS, tagged, type PersonaId } from "@/lib/personas";
+import type { BloodType } from "@/lib/types";
 import { LAST_TICK, TICK_MS, checkTriggers, vitalsAt, vitalsLine, type Vitals } from "@/lib/vitals";
 
 // One case, one agent conversation, three people. Each column shows what its persona said and what
@@ -34,7 +35,7 @@ const EMPTY: Record<PersonaId, { title: string; hint: string; prompt?: string }>
 
 // Once an alert lands, the doctor's first question is one tap away.
 const ALERTED = {
-  doctor: { title: "Unit 12 is minutes out", hint: "Ask HealthForce anything about the incoming patient.", prompt: "What would I miss on this patient? Then get the bay ready for him." },
+  doctor: { title: "Unit 12 is minutes out", hint: "Ask HealthForce anything about the incoming patient.", prompt: "What would I miss on this patient? Then get the bay ready, including a fresh dressing for his scalp." },
   nurse: { title: "Get bay 4 ready", hint: "Ask HealthForce what this patient needs before arrival.", prompt: "What should I prepare before he arrives? Any allergies or access issues?" },
 } as const;
 
@@ -138,6 +139,9 @@ export function TeamApp() {
     const inbox: Record<PersonaId, InboxItem[]> = { paramedic: [], doctor: [], nurse: [] };
     const ready: ReadyItem[] = [];
     const asked = new Set<string>();
+    const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9+-]+/g, " ").trim();
+    // The latest reply that changed the nurse's list; its additions are highlighted as new.
+    const lastEdit = [...turns].reverse().find((t) => t.role === "assistant" && turnDirectives(t).tasks.some((l) => l.to === "nurse"))?.id;
     for (const turn of turns) {
       if (turn.role !== "assistant") continue;
       const d = turnDirectives(turn);
@@ -151,12 +155,22 @@ export function TeamApp() {
             inbox[t.to].push({ id: `${turn.id}-t${ti}-${i}`, from: "HealthForce", priority: "routine", title: item.task, summary: item.why, at: Number(turn.id.split(":")[1] ?? 0) });
             return;
           }
+          const by = turn.replyTo ? PERSONAS[turn.replyTo].name : "HealthForce";
+          if (item.op === "remove") {
+            // Strike the open item the doctor named; it stays visible, labelled, so nothing silently disappears.
+            const words = norm(item.match ?? item.task).split(" ").filter((w) => w.length > 3);
+            const target = ready.find((r) => !r.removed && words.some((w) => norm(r.task).includes(w)));
+            if (target) target.removed = { by, reason: item.reason };
+            return;
+          }
+          // A new blood order supersedes any blood already open on the list.
+          if (item.blood) for (const r of ready) if (r.blood && !r.removed && !r.done) r.removed = { by, reason: "Replaced by a new blood order" };
           // Later replies often restate earlier tasks; keep the first.
-          const key = item.task.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 40);
+          const key = norm(item.task).slice(0, 40);
           if (asked.has(key)) return;
           asked.add(key);
           const id = `${turn.id}-t${ti}-${i}`;
-          ready.push({ id, task: item.task, why: item.why, done: done.includes(id) });
+          ready.push({ id, task: item.task, why: item.why, done: done.includes(id), blood: item.blood, fresh: turn.id === lastEdit });
         }),
       );
     }
@@ -184,6 +198,30 @@ export function TeamApp() {
     [turns],
   );
 
+  // Once the patient is known, their blood group on file joins the agent's context, so "hang blood"
+  // resolves to a group nobody has to say.
+  const typed = useRef<number | null>(null);
+  useEffect(() => {
+    if (!patient || typed.current === patient.patient_id) return;
+    typed.current = patient.patient_id;
+    fetch(`/api/blood-type?patientId=${patient.patient_id}`)
+      .then((r) => r.json())
+      .then(({ blood }: { blood: BloodType | null }) =>
+        pending.current.push(
+          blood
+            ? `Chart: blood group on file for ${patient.name} is ${blood.abo_rh} (type and screen at ${blood.care_site ?? "an unknown site"}, ${blood.tested_on ?? "date unknown"}; synthetic record).`
+            : `Chart: no blood group on file for ${patient.name}.`,
+        ),
+      )
+      .catch(() => {});
+  }, [patient]);
+
+  // The doctor's orders can name items on the nurse's list, so the agent sees what is open.
+  const openList = useRef<string[]>([]);
+  useEffect(() => {
+    openList.current = routed.ready.filter((r) => !r.done && !r.removed).map((r) => r.task);
+  }, [routed]);
+
   // The ref is the source of truth for queued runs, which start before React re-renders.
   const commit = useCallback((next: Turn[]) => {
     turnsRef.current = next;
@@ -196,7 +234,8 @@ export function TeamApp() {
     const first = !prior.some((t) => t.role === "user");
     // Humans' messages carry the latest monitor reading so answers use current vitals.
     const reading = !auto && vitalsRef.current.length ? vitalsLine(vitalsRef.current) : null;
-    const updates = [...pending.current, ...(reading ? [reading] : [])];
+    const list = persona === "doctor" && openList.current.length ? `Open on the nurse's ready list: ${openList.current.map((t) => `"${t}"`).join("; ")}.` : null;
+    const updates = [...pending.current, ...(reading ? [reading] : []), ...(list ? [list] : [])];
     const user: UserTurn = { id: uid(), role: "user", persona, text, auto, sent: tagged(persona, text, updates, first, auto) };
     pending.current = [];
     let reply: AssistantTurn = { ...newAssistantTurn(), id: `${uid()}:${Date.now()}`, replyTo: persona };
@@ -257,7 +296,7 @@ export function TeamApp() {
 
   const toggleTask = (id: string) => {
     const item = routed.ready.find((r) => r.id === id);
-    if (!item) return;
+    if (!item || item.removed) return;
     if (done.includes(id)) {
       setDone((d) => d.filter((x) => x !== id));
       return;
@@ -283,6 +322,7 @@ export function TeamApp() {
     setSeen(EMPTY_SEEN);
     setChartOpen(false);
     pending.current = [];
+    typed.current = null;
     lastCounts.current = { paramedic: 0, doctor: 0, nurse: 0 };
   };
 

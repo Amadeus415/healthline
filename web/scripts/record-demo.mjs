@@ -7,7 +7,7 @@ import { join } from "node:path";
 const url = process.argv[2] ?? "http://localhost:3000/team";
 const outDir = process.argv[3] ?? "demo-video";
 const size = { width: 1920, height: 1080 };
-const AGENT_TIMEOUT = 180_000;
+const AGENT_TIMEOUT = 300_000;
 
 mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch();
@@ -42,54 +42,77 @@ async function idle() {
 
 const column = (role) => page.locator("section").filter({ has: page.locator(".label", { hasText: new RegExp(`^${role}$`, "i") }) });
 
-await page.goto(url);
-await page.evaluate(() => localStorage.removeItem("hl-team"));
-await page.reload();
-await page.waitForSelector("text=Field report");
+// On failure, keep a screenshot of where it stopped and still finish the video.
+let failed = null;
+try {
+  await page.goto(url);
+  await page.evaluate(() => localStorage.removeItem("hl-team"));
+  await page.reload();
+  await page.waitForSelector("text=Field report");
 
-await caption("One Cortex Agent, three people on one case: paramedic, ER doctor and nurse.");
-await pause(3500);
+  await caption("One Cortex Agent, three people on one case: paramedic, ER doctor and nurse.");
+  await pause(3500);
 
-await caption("The paramedic sends a field report. The live ambulance monitor starts streaming.");
-await column("paramedic").getByRole("button", { name: /Unit 12 inbound/ }).click();
-await pause(3000);
-await caption("The agent searches 1.4M synthetic patients and narrows them to a few likely people.");
-await column("paramedic").getByRole("button", { name: "Neither" }).waitFor({ timeout: AGENT_TIMEOUT });
-await pause(2000);
+  await caption("The paramedic sends a field report. The live ambulance monitor starts streaming.");
+  await column("paramedic").getByRole("button", { name: /Unit 12 inbound/ }).click();
+  await pause(3000);
+  await caption("The agent searches 1.4M synthetic patients and narrows them to a few likely people.");
+  await column("paramedic").getByRole("button", { name: "Neither" }).waitFor({ timeout: AGENT_TIMEOUT });
+  await pause(2000);
 
-await caption("One bedside check. The paramedic taps “Neither”.");
-await pause(1500);
-await column("paramedic").getByRole("button", { name: "Neither" }).click();
-await caption("Identity narrows to one person. The doctor is alerted before the ambulance arrives.");
-await page.waitForSelector("text=Monitor alarm", { timeout: AGENT_TIMEOUT });
-await caption("Nobody asked: the monitor sees BP falling and alarms the team on its own.");
-await idle();
-await caption("The doctor gets a critical alert. The nurse gets a ready list. Nobody had to ask.");
-await pause(5000);
+  await caption("One bedside check. The paramedic taps “Neither”.");
+  await pause(1500);
+  await column("paramedic").getByRole("button", { name: "Neither" }).click();
+  await caption("Identity narrows to one person. The doctor is alerted before the ambulance arrives.");
+  await page.waitForSelector("text=Monitor alarm", { timeout: AGENT_TIMEOUT });
+  await caption("Nobody asked: the monitor sees BP falling and alarms the team on its own.");
+  await idle();
+  await caption("The doctor gets a critical alert. The nurse gets a ready list. Nobody had to ask.");
+  await pause(5000);
 
-await caption("The doctor asks what a busy team would miss, and asks for the bay to be prepared.");
-await column("doctor").getByRole("button", { name: /What would I miss/ }).click();
-await idle();
-await pause(5000);
+  await caption("The doctor asks what a busy team would miss, and asks for the bay to be prepared.");
+  await column("doctor").getByRole("button", { name: /What would I miss/ }).click();
+  await idle();
+  await pause(5000);
 
-await caption("The nurse ticks items off. The doctor sees each one, and so does the agent.");
-await column("nurse").locator("[data-ready-item]").first().click();
-await pause(3500);
+  await caption("The patient arrives. The doctor gives a short order and never says a blood group.");
+  const order = column("doctor").locator("textarea");
+  await order.click();
+  await order.pressSequentially("He's here. Pull off the gauze and hang blood.", { delay: 45 });
+  await pause(600);
+  await order.press("Enter");
+  await caption("HealthForce reads his blood group from the chart and rewrites the nurse's list.");
+  await idle();
+  await column("nurse").locator("[data-ready-item]").first().scrollIntoViewIfNeeded();
+  await caption("Gauze struck out. Two units of type-specific blood added, with where the group came from.");
+  await pause(7000);
 
-await caption("The nurse asks their own question, with the latest vitals attached automatically.");
-await column("nurse").getByRole("button", { name: /What should I prepare/ }).click();
-await idle();
-await pause(5000);
+  await caption("The nurse ticks the blood off. The doctor sees it, and so does the agent.");
+  await column("nurse").locator("[data-ready-item]:not([data-removed])", { hasText: /PRBC|packed|blood/i }).first().click();
+  await pause(3500);
 
-await caption("The doctor opens the chart pulled together from every care site.");
-await column("doctor").getByRole("button", { name: "Patient chart" }).click();
-await pause(6000);
-await column("doctor").getByRole("button", { name: "Patient chart" }).click();
+  await caption("The nurse asks their own question, with the latest vitals attached automatically.");
+  const ask = column("nurse").locator("textarea");
+  await ask.click();
+  await ask.pressSequentially("Any reason not to give it warm and fast?", { delay: 40 });
+  await ask.press("Enter");
+  await idle();
+  await pause(5000);
 
-await caption("HealthForce: one agent on Snowflake catching what slips past a busy team.");
-await pause(5000);
-await caption("");
-await pause(800);
+  await caption("The doctor opens the chart pulled together from every care site.");
+  await column("doctor").getByRole("button", { name: "Patient chart" }).click();
+  await pause(6000);
+  await column("doctor").getByRole("button", { name: "Patient chart" }).click();
+
+  await caption("HealthForce: one agent on Snowflake catching what slips past a busy team.");
+  await pause(5000);
+  await caption("");
+  await pause(800);
+
+} catch (e) {
+  failed = e;
+  await page.screenshot({ path: join(outDir, "failure.png") }).catch(() => {});
+}
 
 const video = page.video();
 await context.close();
@@ -98,3 +121,7 @@ const raw = await video.path();
 const target = join(outDir, "healthforce-team-demo.webm");
 renameSync(raw, target);
 console.log(target);
+if (failed) {
+  console.error(`Stopped early: ${failed.message.split("\n")[0]}. See ${join(outDir, "failure.png")}`);
+  process.exitCode = 1;
+}

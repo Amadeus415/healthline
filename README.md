@@ -114,6 +114,14 @@ or SpO2 below 92, the monitor sends an alarm to the agent itself, tagged `[Monit
 doctor still gets a critical handoff and the nurse a ready list. Every human message also carries the
 latest reading. The fast-forward button in the monitor runs the feed at 3x.
 
+**Orders without the details.** When the doctor says "Pull off the gauze and hang blood", HealthForce
+strikes the gauze item off the nurse's ready list and adds 2 units of type-specific packed red cells with
+the patient's group and where it came from, plus a fresh type and screen. Nobody says the group. Synthea has
+no blood types, so `HEALTHFORCE.CLINICAL.PATIENT_BLOOD_TYPE` holds a synthetic one per patient (US
+frequencies, fixed per patient, stamped on their latest clinical visit; `snowflake/05_blood_type.sql`).
+The app reads it through `/api/blood-type` once the patient is identified and passes it to the agent with
+the open ready list.
+
 **Recording the demo.** With the app running, `cd web && node scripts/record-demo.mjs` drives the whole
 flow in headless Chromium with captions and writes `web/demo-video/healthforce-team-demo.webm`
 (`npx playwright install chromium` once first). Convert for sharing with

@@ -228,7 +228,10 @@ export async function streamAgent(
 }
 
 export type Handoff = { to: PersonaId; priority: "critical" | "high" | "routine"; title: string; summary: string };
-export type TaskList = { to: PersonaId; items: { task: string; why?: string }[] };
+export type Blood = { product: string; units?: number; abo_rh: string; source?: string };
+/** A ready-list change: add a task (the default), or remove the open one whose text contains `match`. */
+export type TaskItem = { op: "add" | "remove"; task: string; why?: string; match?: string; reason?: string; blood?: Blood };
+export type TaskList = { to: PersonaId; items: TaskItem[] };
 export type Catch = { kind: "safety" | "time" | "cost" | "research"; text: string };
 
 export type Directives = { body: string; options: string[]; handoffs: Handoff[]; tasks: TaskList[]; catches: Catch[] };
@@ -266,8 +269,15 @@ export function parseDirectives(text: string): Directives {
         for (const t of list(value) as Record<string, unknown>[]) {
           const to = str(t.to).toLowerCase() || "nurse";
           const items = list(t.items)
-            .map((i) => (typeof i === "string" ? { task: i } : { task: str((i as Record<string, unknown>).task), why: str((i as Record<string, unknown>).why) || undefined }))
-            .filter((i) => i.task);
+            .map((raw): TaskItem => {
+              if (typeof raw === "string") return { op: "add", task: raw };
+              const i = raw as Record<string, unknown>;
+              const b = i.blood as Record<string, unknown> | undefined;
+              const blood = b && str(b.abo_rh) ? { product: str(b.product) || "PRBC", units: Number(b.units) || undefined, abo_rh: str(b.abo_rh), source: str(b.source) || undefined } : undefined;
+              const op = str(i.op).toLowerCase() === "remove" ? "remove" : "add";
+              return { op, task: str(i.task), why: str(i.why) || undefined, match: str(i.match) || undefined, reason: str(i.reason) || undefined, blood };
+            })
+            .filter((i) => (i.op === "remove" ? i.match || i.task : i.task));
           if (PERSONA_IDS.includes(to) && items.length) out.tasks.push({ to: to as PersonaId, items });
         }
       if (kind === "catches")
@@ -281,7 +291,7 @@ export function parseDirectives(text: string): Directives {
     .replace(/```(options|handoff|tasks|catches)[\s\S]*$/, "")
     // The team tags are for the agent; drop one if it echoes it back.
     .replace(/^\s*(\*\*|__)?\[(Paramedic|Doctor|Nurse|Monitor)[^\]]*\]\1?\s*/i, "")
-    .replace(/^(Paramedic|Doctor|Dr\. Okafor|Nurse)\s*[:,]\s+/i, "")
+    .replace(/^(\*\*)?(Paramedic|Doctor|Dr\. Okafor|Nurse)\s*[:,]\s*(\*\*)?\s*/i, "")
     .trim();
   return out;
 }

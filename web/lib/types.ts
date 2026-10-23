@@ -68,3 +68,5 @@ export type Bay = {
   on_blood_thinner: boolean | null;
   has_severe_allergy: boolean | null;
 };
+
+export type BloodType = { patient_id: number; abo_rh: string; tested_on: string | null; care_site: string | null; synthetic: boolean };
