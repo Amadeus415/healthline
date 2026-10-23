@@ -17,7 +17,7 @@ type Case = { id: string; title: string; bay?: number; label?: string; unidentif
 const STORE = "hl-cases";
 const CLINICIAN = "Dr. Okafor";
 
-function useMedia(query: string) {
+export function useMedia(query: string) {
   return useSyncExternalStore(
     (onChange) => {
       const mq = matchMedia(query);

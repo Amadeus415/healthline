@@ -135,6 +135,14 @@ strong {
     transform: translate3d(6%, 4%, 0) scale(1.08);
   }
 }
+@keyframes ring {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 @keyframes caret {
   50% {
     opacity: 0;

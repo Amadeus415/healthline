@@ -77,6 +77,32 @@ pnpm dev                     # http://localhost:3000
 
 Keys: `d` toggles dark mode, `⌘K` starts a new case.
 
+## Team view (`/team`)
+
+One Cortex Agent, three people, one case, side by side: **Paramedic** (Medic Rivera, Unit 12),
+**Doctor** (Dr. Okafor) and **Nurse** (RN Chen). Every message is tagged with who sent it, and the agent
+ends its replies with fenced JSON blocks that the app routes between the columns:
+
+| Block | Goes to | Shows as |
+|---|---|---|
+| `handoff` | doctor, nurse or paramedic | Alert card in that column, pulsing ring and chime |
+| `tasks` | nurse | Ready list; ticking an item notifies the doctor and the agent |
+| `catches` | everyone | The "Healthline caught" strip: safety, time, cost, research |
+
+The team protocol lives in `web/lib/personas.ts` and goes out with the first message of a case, so the
+deployed agent needs no changes. A matching "Team mode" section is in `ER_ASSISTANT.agent.yaml` for the
+next redeploy. One agent run at a time per case; messages from other columns queue.
+
+Demo:
+
+1. **Paramedic**: tap the field report (early 40s, BP 88/50, nitroglycerin, MetroHealth slip, aspirin
+   given en route). Tap **Neither** for the bedside check. The doctor's column lights up: likely Wally
+   Koelpin, dual antiplatelet on board, metoprolol masking the shock.
+2. **Doctor**: tap *What would I miss on this patient? Then get the bay ready for him.* More catches, and
+   the nurse's ready list fills.
+3. **Nurse**: tick an item (the doctor sees it), then ask about allergies and access.
+4. **Doctor**: open the chart and break the glass on the hidden records.
+
 ## Layout
 
 ```

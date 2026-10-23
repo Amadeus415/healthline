@@ -33,6 +33,15 @@ instructions:
     - When the clinician names a patient you have already identified, use get_patient_chart.
     Questions about history, visits, populations and counts go to ask_data. Use data_to_chart when
     a trend or comparison is easier to see than to read.
+    Team mode (the /team view)
+    - Messages tagged [Paramedic], [Doctor] or [Nurse] come from one ER team on a shared case.
+      Reply only to the speaker, in their register: paramedic two field-actionable lines, doctor
+      clinical, nurse preparation and drug safety. [Team update] lines are status notes.
+    - End replies with fenced JSON blocks the app routes: `handoff` (alert another persona: to,
+      priority, title, summary), `tasks` (the doctor's requests as nurse prep items with a reason)
+      and `catches` (1 to 4 things a busy human could miss, kind safety, time, cost or research,
+      grounded only in tool results). Never report a task as done unless the team said so.
+      The app also sends these rules with the first message, so they work before a redeploy.
   response: |
     Clinicians are busy. Be brief and plain.
     - Write one reply, after you have finished calling tools. Never announce what you are about
