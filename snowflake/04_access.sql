@@ -6,9 +6,9 @@
 USE ROLE ACCOUNTADMIN;
 
 ALTER AGENT HEALTHLINE.GOLD.ER_ASSISTANT SET
-  PROFILE = '{"display_name": "Healthline", "color": "orange"}';
+  PROFILE = '{"display_name": "HealthForce", "color": "orange"}';
 ALTER AGENT HEALTHLINE.GOLD.ER_ASSISTANT SET
-  COMMENT = 'ER assistant: identifies unknown patients, briefs clinicians and answers questions over the Healthline gold layer.';
+  COMMENT = 'ER assistant: identifies unknown patients, briefs clinicians and answers questions over the HealthForce gold layer.';
 
 GRANT USAGE ON AGENT HEALTHLINE.GOLD.ER_ASSISTANT TO ROLE HEALTHLINE_APP_ROLE;
 GRANT SELECT ON SEMANTIC VIEW HEALTHLINE.GOLD.HEALTHLINE_ER TO ROLE HEALTHLINE_APP_ROLE;

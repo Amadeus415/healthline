@@ -7,7 +7,7 @@ const serif = Instrument_Serif({ variable: "--font-instrument-serif", subsets: [
 const mono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], weight: "400" });
 
 export const metadata: Metadata = {
-  title: "Healthline · ER assistant",
+  title: "HealthForce · ER assistant",
   description: "Identify unknown patients and brief ER clinicians in seconds, on Snowflake.",
 };
 

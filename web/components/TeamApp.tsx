@@ -3,21 +3,21 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Moon, RotateCcw, Sun } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useMedia } from "./App";
-import { CatchStrip } from "./CatchStrip";
 import { Mark } from "./Mark";
 import { PatientPanel } from "./PatientPanel";
 import { PersonaColumn, type InboxItem } from "./PersonaColumn";
+import { PHONE, PhoneFrame } from "./PhoneFrame";
 import { ReadyList, type ReadyItem } from "./ReadyList";
 import { VitalsMonitor } from "./VitalsMonitor";
 import { applyEvent, newAssistantTurn, streamAgent, toMessages, turnDirectives, uid, type AssistantTurn, type Turn, type UserTurn } from "@/lib/conversation";
 import { FIELD_REPORT, ORDER, PERSONAS, tagged, type PersonaId } from "@/lib/personas";
-import { LAST_TICK, TICK_MS, bp, checkTriggers, vitalsAt, vitalsLine, type Vitals } from "@/lib/vitals";
+import { LAST_TICK, TICK_MS, checkTriggers, vitalsAt, vitalsLine, type Vitals } from "@/lib/vitals";
 
 // One case, one agent conversation, three people. Each column shows what its persona said and what
-// Healthline said back; handoffs, tasks and catches in any reply are routed to the right column.
+// HealthForce said back; handoffs and tasks in any reply are routed to the right column.
 
 type Note = { id: string; to: PersonaId; from: PersonaId; title: string; at: number };
 type Saved = { turns: Turn[]; done: string[]; notes: Note[]; seen: Record<PersonaId, number> };
@@ -27,15 +27,15 @@ const STORE = "hl-team";
 const EMPTY_SEEN: Record<PersonaId, number> = { paramedic: 0, doctor: 0, nurse: 0 };
 
 const EMPTY: Record<PersonaId, { title: string; hint: string; prompt?: string }> = {
-  paramedic: { title: "Field report", hint: "Tell Healthline what you see. It finds who this is and alerts the ER before you arrive.", prompt: FIELD_REPORT },
+  paramedic: { title: "Field report", hint: "Tell HealthForce what you see. It finds who this is and alerts the ER before you arrive.", prompt: FIELD_REPORT },
   doctor: { title: "Waiting for Unit 12", hint: "Alerts from the field land here. Ask anything, or tell the nurse what to prepare." },
   nurse: { title: "Bay 4 is clear", hint: "The ready list fills when the doctor asks for something. Tick items off as you go." },
 };
 
 // Once an alert lands, the doctor's first question is one tap away.
 const ALERTED = {
-  doctor: { title: "Unit 12 is minutes out", hint: "Ask Healthline anything about the incoming patient.", prompt: "What would I miss on this patient? Then get the bay ready for him." },
-  nurse: { title: "Get bay 4 ready", hint: "Ask Healthline what this patient needs before arrival.", prompt: "What should I prepare before he arrives? Any allergies or access issues?" },
+  doctor: { title: "Unit 12 is minutes out", hint: "Ask HealthForce anything about the incoming patient.", prompt: "What would I miss on this patient? Then get the bay ready for him." },
+  nurse: { title: "Get bay 4 ready", hint: "Ask HealthForce what this patient needs before arrival.", prompt: "What should I prepare before he arrives? Any allergies or access issues?" },
 } as const;
 
 function load(): Saved {
@@ -80,7 +80,25 @@ export function TeamApp() {
   const turnsRef = useRef(turns);
   const pending = useRef<string[]>([]);
   const abort = useRef<AbortController | null>(null);
-  const narrow = useMedia("(max-width: 1220px)");
+  // On a real phone, one persona at a time; anywhere bigger, three identical phones scaled together.
+  const narrow = useMedia("(max-width: 760px)");
+  const stage = useRef<HTMLDivElement>(null);
+  // Fill the screen: the three phones share the width equally, the scale follows from that (so text
+  // grows on big screens), and the phone height stretches to whatever height is left.
+  const [scale, setScale] = useState(1);
+  const rowWidth = 3 * PHONE.width + 2 * PHONE.gap;
+  const rowHeight = PHONE.height + PHONE.label;
+
+  useLayoutEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const measure = () => {
+      setScale(Math.min(1.6, (el.clientWidth - 48) / rowWidth, (el.clientHeight - 24) / rowHeight));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rowWidth, rowHeight, narrow]);
 
   // The ambulance monitor: starts with the field report, alarms go to the agent like any message.
   const [vitals, setVitals] = useState<Vitals[]>([]);
@@ -115,24 +133,22 @@ export function TeamApp() {
     if (!running) localStorage.setItem(STORE, JSON.stringify({ turns, done, notes, seen } satisfies Saved));
   }, [turns, done, notes, seen, running]);
 
-  // Everything Healthline asked the team to do, read from its replies.
+  // Everything HealthForce asked the team to do, read from its replies.
   const routed = useMemo(() => {
     const inbox: Record<PersonaId, InboxItem[]> = { paramedic: [], doctor: [], nurse: [] };
     const ready: ReadyItem[] = [];
-    const catches: { id: string; kind: "safety" | "time" | "cost" | "research"; text: string }[] = [];
-    const caught = new Set<string>();
     const asked = new Set<string>();
     for (const turn of turns) {
       if (turn.role !== "assistant") continue;
       const d = turnDirectives(turn);
-      const from = turn.replyTo ? PERSONAS[turn.replyTo].name : "Healthline";
+      const from = turn.replyTo ? PERSONAS[turn.replyTo].name : "HealthForce";
       d.handoffs.forEach((h, i) =>
-        inbox[h.to].push({ id: `${turn.id}-h${i}`, from: `Healthline · ${from}`, priority: h.priority, title: h.title, summary: h.summary, at: Number(turn.id.split(":")[1] ?? 0) }),
+        inbox[h.to].push({ id: `${turn.id}-h${i}`, from: `HealthForce · ${from}`, priority: h.priority, title: h.title, summary: h.summary, at: Number(turn.id.split(":")[1] ?? 0) }),
       );
       d.tasks.forEach((t, ti) =>
         t.items.forEach((item, i) => {
           if (t.to !== "nurse") {
-            inbox[t.to].push({ id: `${turn.id}-t${ti}-${i}`, from: "Healthline", priority: "routine", title: item.task, summary: item.why, at: Number(turn.id.split(":")[1] ?? 0) });
+            inbox[t.to].push({ id: `${turn.id}-t${ti}-${i}`, from: "HealthForce", priority: "routine", title: item.task, summary: item.why, at: Number(turn.id.split(":")[1] ?? 0) });
             return;
           }
           // Later replies often restate earlier tasks; keep the first.
@@ -143,15 +159,9 @@ export function TeamApp() {
           ready.push({ id, task: item.task, why: item.why, done: done.includes(id) });
         }),
       );
-      d.catches.forEach((c, i) => {
-        const key = c.text.toLowerCase().slice(0, 60);
-        if (caught.has(key)) return;
-        caught.add(key);
-        catches.push({ id: `${turn.id}-c${i}`, ...c });
-      });
     }
     for (const n of notes) inbox[n.to].push({ id: n.id, from: PERSONAS[n.from].name, priority: "routine", title: n.title, at: n.at });
-    return { inbox, ready, catches };
+    return { inbox, ready };
   }, [turns, done, notes]);
 
   // Alert a column when something new lands in its inbox.
@@ -296,7 +306,7 @@ export function TeamApp() {
 
   const column = (p: PersonaId) => {
     const own = turns.filter((t) => (t.role === "user" ? t.persona === p : t.replyTo === p));
-    return (
+    const body = (
       <PersonaColumn
         key={p}
         persona={PERSONAS[p]}
@@ -305,7 +315,6 @@ export function TeamApp() {
         running={running === p}
         queued={queue.filter((q) => q.persona === p).length}
         inbox={routed.inbox[p]}
-        fresh={fresh(p)}
         empty={p !== "paramedic" && counts[p] ? ALERTED[p] : EMPTY[p]}
         onAck={() => ack(p)}
         onSend={(text) => send(p, text)}
@@ -332,6 +341,12 @@ export function TeamApp() {
         )}
       </PersonaColumn>
     );
+    if (narrow) return <div key={p} data-persona={p} className="flex min-h-0 flex-1 flex-col">{body}</div>;
+    return (
+      <PhoneFrame key={p} persona={PERSONAS[p]} fresh={fresh(p)}>
+        {body}
+      </PhoneFrame>
+    );
   };
 
   return (
@@ -339,26 +354,16 @@ export function TeamApp() {
       <header className="flex h-[50px] flex-none items-center gap-4 border-b border-line px-5">
         <Link href="/" className="flex items-center gap-2.5 font-serif text-[24px] leading-none tracking-[-.01em]">
           <Mark className="size-[20px]" />
-          Healthline
+          HealthForce
         </Link>
-        <span className="label rounded-full border border-line px-2.5 py-1">Team</span>
-        <div className="min-w-0 truncate text-[15px]">
-          <span className="text-mute">Unit 12 inbound · Bay 4</span>
-          <AnimatePresence>
-            {patient && (
-              <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}>
-                <span className="mx-1.5 text-mute">→</span>
-                most likely <span className="font-normal">{patient.name}</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-        <div className="ml-auto flex items-center gap-1.5 text-mute">
-          {vitals.length > 0 && (
-            <span className={clsx("mr-2 font-mono text-[12px] tabular-nums", vitals.at(-1)!.sbp < 90 ? "text-accent" : "text-ink")}>
-              BP {bp(vitals.at(-1)!)} · HR {vitals.at(-1)!.hr} · SpO2 {vitals.at(-1)!.spo2}%
-            </span>
+        <AnimatePresence>
+          {patient && (
+            <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 truncate text-[15px] text-mute">
+              Unit 12 patient: most likely <span className="font-normal text-ink">{patient.name}</span>
+            </motion.span>
           )}
+        </AnimatePresence>
+        <div className="ml-auto flex items-center gap-1.5 text-mute">
           <span className="inline-flex items-center gap-[7px] rounded-full border border-line px-[11px] py-1.5 font-mono text-[10.5px] leading-none tracking-[.07em] whitespace-nowrap uppercase max-sm:hidden">
             <span className={clsx("size-1.5 rounded-full bg-accent", running ? "animate-[pulse-dot_0.8s_infinite]" : "animate-[pulse-dot_2s_infinite]")} />
             One Cortex Agent · 3 people
@@ -371,8 +376,6 @@ export function TeamApp() {
           </button>
         </div>
       </header>
-
-      <CatchStrip catches={routed.catches} />
 
       {narrow && (
         <nav className="flex flex-none border-b border-line">
@@ -393,7 +396,17 @@ export function TeamApp() {
         </nav>
       )}
 
-      <main className={clsx("grid min-h-0 flex-1", narrow ? "grid-cols-1" : "grid-cols-3")}>{narrow ? column(tab) : ORDER.map(column)}</main>
+      {narrow ? (
+        <main className="flex min-h-0 flex-1 flex-col">{column(tab)}</main>
+      ) : (
+        <main ref={stage} className="grid min-h-0 flex-1 place-items-center overflow-hidden">
+          <div style={{ width: rowWidth * scale, height: rowHeight * scale }}>
+            <div className="flex origin-top-left" style={{ width: rowWidth, gap: PHONE.gap, transform: `scale(${scale})` }}>
+              {ORDER.map(column)}
+            </div>
+          </div>
+        </main>
+      )}
     </div>
   );
 }

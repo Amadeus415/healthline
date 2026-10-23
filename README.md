@@ -1,8 +1,11 @@
-# Healthline
+# HealthForce
 
 An ER assistant on Snowflake. A clinician describes an unidentified patient; a Cortex Agent narrows
 1.4M patients to a few likely people, asks for one bedside check, names the most likely match, and
 opens their chart, pulled together from every care site that holds their records.
+
+HealthForce was called Healthline; the Snowflake objects keep the `HEALTHLINE` names (database, warehouse,
+app role and service user) so existing deployments keep working.
 
 ```
 Browser (Next.js) ──► /api/agent ──SSE──► Cortex Agent  HEALTHLINE.GOLD.ER_ASSISTANT
@@ -79,40 +82,42 @@ Keys: `d` toggles dark mode, `⌘K` starts a new case.
 
 ## Team view (`/team`)
 
-One Cortex Agent, three people, one case, side by side: **Paramedic** (Medic Rivera, Unit 12),
-**Doctor** (Dr. Okafor) and **Nurse** (RN Chen). Every message is tagged with who sent it, and the agent
-ends its replies with fenced JSON blocks that the app routes between the columns:
+One Cortex Agent, three people, one case: three phones side by side, each in its own colours, for the
+**Paramedic** (Medic Rivera, Unit 12, blue), **Doctor** (Dr. Okafor, red) and **Nurse** (RN Chen, teal).
+Every message is tagged with who sent it, and the agent ends its replies with fenced JSON blocks that the
+app routes between the phones:
 
 | Block | Goes to | Shows as |
 |---|---|---|
-| `handoff` | doctor, nurse or paramedic | Alert card in that column, pulsing ring and chime |
+| `handoff` | doctor, nurse or paramedic | Alert card on that phone, pulsing ring and chime |
 | `tasks` | nurse | Ready list; ticking an item notifies the doctor and the agent |
-| `catches` | everyone | The "Healthline caught" strip: safety, time, cost, research |
 
 The team protocol lives in `web/lib/personas.ts` and goes out with the first message of a case, so the
 deployed agent needs no changes. A matching "Team mode" section is in `ER_ASSISTANT.agent.yaml` for the
-next redeploy. One agent run at a time per case; messages from other columns queue.
+next redeploy. One agent run at a time per case; messages from other phones queue. Clinical replies end
+with 1 to 3 bold bullets on what a busy team could miss (interactions, records held at another care site,
+tests that need not be repeated).
 
 Demo:
 
 1. **Paramedic**: tap the field report (early 40s, BP 88/50, nitroglycerin, MetroHealth slip, aspirin
-   given en route). Tap **Neither** for the bedside check. The doctor's column lights up: likely Wally
+   given en route). Tap **Neither** for the bedside check. The doctor's phone lights up: likely Wally
    Koelpin, dual antiplatelet on board, metoprolol masking the shock.
-2. **Doctor**: tap *What would I miss on this patient? Then get the bay ready for him.* More catches, and
-   the nurse's ready list fills.
+2. **Doctor**: tap *What would I miss on this patient? Then get the bay ready for him.* What a busy team
+   would miss, and the nurse's ready list fills.
 3. **Nurse**: tick an item (the doctor sees it), then ask about allergies and access.
 4. **Doctor**: open the chart and break the glass on the hidden records.
 
-**Live vitals.** The field report starts a simulated ambulance monitor in the paramedic's column (BP 88/50
+**Live vitals.** The field report starts a simulated ambulance monitor in the paramedic's phone (BP 88/50
 drifting to about 76/42, HR and RR climbing, SpO2 slipping; `web/lib/vitals.ts`). When BP falls below 80
 or SpO2 below 92, the monitor sends an alarm to the agent itself, tagged `[Monitor]`: nobody asked, and the
 doctor still gets a critical handoff and the nurse a ready list. Every human message also carries the
 latest reading. The fast-forward button in the monitor runs the feed at 3x.
 
 **Recording the demo.** With the app running, `cd web && node scripts/record-demo.mjs` drives the whole
-flow in headless Chromium with captions and writes `web/demo-video/healthline-team-demo.webm`
+flow in headless Chromium with captions and writes `web/demo-video/healthforce-team-demo.webm`
 (`npx playwright install chromium` once first). Convert for sharing with
-`ffmpeg -i healthline-team-demo.webm -c:v libx264 -pix_fmt yuv420p healthline-team-demo.mp4`.
+`ffmpeg -i healthforce-team-demo.webm -c:v libx264 -pix_fmt yuv420p healthforce-team-demo.mp4`.
 
 ## Layout
 
