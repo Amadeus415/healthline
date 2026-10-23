@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* Tokens from the mockup: paper, hairlines, light sans, italic serif, mono labels, one accent. */
+:root {
+  --paper: #faf9f6;
+  --side: #f2f1ec;
+  --raise: #ffffff;
+  --bubble: #eceae3;
+  --ink: #151515;
+  --mute: #8b8a84;
+  --line: rgba(21, 21, 21, 0.1);
+  --edge: rgba(21, 21, 21, 0.32);
+  --accent: #ec4f2a;
+  --accent-soft: rgba(236, 79, 42, 0.08);
+  --glow: rgba(236, 79, 42, 0.16);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #121211;
+  --side: #0c0c0b;
+  --raise: #1a1a18;
+  --bubble: #232320;
+  --ink: #ecebe5;
+  --mute: #7c7b75;
+  --line: rgba(236, 235, 229, 0.1);
+  --edge: rgba(236, 235, 229, 0.32);
+  --accent-soft: rgba(236, 79, 42, 0.14);
+  --glow: rgba(236, 79, 42, 0.22);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-side: var(--side);
+  --color-raise: var(--raise);
+  --color-bubble: var(--bubble);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-line: var(--line);
+  --color-edge: var(--edge);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  transition: background-color 0.4s, color 0.4s;
+}
+
+em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  padding-right: 0.04em;
+}
+
+b,
+strong {
+  font-weight: 500;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+@layer components {
+  .label {
+    font: 400 11px/1.4 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+  .hairline > * + * {
+    border-top: 1px solid var(--line);
+  }
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes nudge {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(236, 79, 42, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(236, 79, 42, 0.12);
+  }
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 4%, 0) scale(1.08);
+  }
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
