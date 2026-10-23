@@ -41,6 +41,9 @@ const RUNNING: Record<string, string> = {
   ask_data: "Reading the ER data model",
   system_execute_sql: "Querying Snowflake",
   data_to_chart: "Drawing chart",
+  get_er_brief: "Writing the ER brief",
+  confirm_identity: "Confirming identity",
+  search_patient_events: "Searching the patient's history",
 };
 
 function doneLabel(tool: string, result: unknown): string {
@@ -57,6 +60,9 @@ function doneLabel(tool: string, result: unknown): string {
   if (tool === "system_execute_sql") return "Queried Snowflake";
   if (tool === "ask_data") return "Read the ER data model";
   if (tool === "data_to_chart") return "Drew chart";
+  if (tool === "get_er_brief") return "Wrote the ER brief";
+  if (tool === "confirm_identity") return "Checked identity";
+  if (tool === "search_patient_events") return "Searched the patient's history";
   return tool;
 }
 

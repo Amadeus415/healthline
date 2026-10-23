@@ -121,6 +121,7 @@ export function TeamApp() {
     const ready: ReadyItem[] = [];
     const catches: { id: string; kind: "safety" | "time" | "cost" | "research"; text: string }[] = [];
     const caught = new Set<string>();
+    const asked = new Set<string>();
     for (const turn of turns) {
       if (turn.role !== "assistant") continue;
       const d = turnDirectives(turn);
@@ -134,6 +135,10 @@ export function TeamApp() {
             inbox[t.to].push({ id: `${turn.id}-t${ti}-${i}`, from: "Healthline", priority: "routine", title: item.task, summary: item.why, at: Number(turn.id.split(":")[1] ?? 0) });
             return;
           }
+          // Later replies often restate earlier tasks; keep the first.
+          const key = item.task.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 40);
+          if (asked.has(key)) return;
+          asked.add(key);
           const id = `${turn.id}-t${ti}-${i}`;
           ready.push({ id, task: item.task, why: item.why, done: done.includes(id) });
         }),

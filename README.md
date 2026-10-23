@@ -103,6 +103,17 @@ Demo:
 3. **Nurse**: tick an item (the doctor sees it), then ask about allergies and access.
 4. **Doctor**: open the chart and break the glass on the hidden records.
 
+**Live vitals.** The field report starts a simulated ambulance monitor in the paramedic's column (BP 88/50
+drifting to about 76/42, HR and RR climbing, SpO2 slipping; `web/lib/vitals.ts`). When BP falls below 80
+or SpO2 below 92, the monitor sends an alarm to the agent itself, tagged `[Monitor]`: nobody asked, and the
+doctor still gets a critical handoff and the nurse a ready list. Every human message also carries the
+latest reading. The fast-forward button in the monitor runs the feed at 3x.
+
+**Recording the demo.** With the app running, `cd web && node scripts/record-demo.mjs` drives the whole
+flow in headless Chromium with captions and writes `web/demo-video/healthline-team-demo.webm`
+(`npx playwright install chromium` once first). Convert for sharing with
+`ffmpeg -i healthline-team-demo.webm -c:v libx264 -pix_fmt yuv420p healthline-team-demo.mp4`.
+
 ## Layout
 
 ```

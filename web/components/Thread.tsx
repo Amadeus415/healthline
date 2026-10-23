@@ -32,7 +32,13 @@ export function Thread({ turns, busy, onReply, dense }: { turns: Turn[]; busy: b
       last = b.data;
     }
   }
-  const lastId = turns.at(-1)?.id;
+  // Quick replies stay live on the last answer to a person; automatic monitor alarms don't make it stale.
+  let lastId: string | undefined;
+  turns.forEach((turn, i) => {
+    const prev = turns[i - 1];
+    const fromMonitor = turn.role === "user" ? turn.auto : prev?.role === "user" && prev.auto;
+    if (!fromMonitor) lastId = turn.id;
+  });
 
   return (
     <div

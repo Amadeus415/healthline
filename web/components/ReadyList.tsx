@@ -34,6 +34,7 @@ export function ReadyList({ items, onToggle }: { items: ReadyItem[]; onToggle: (
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, ease }}
               onClick={() => onToggle(item.id)}
+              data-ready-item
               className={clsx(
                 "grid grid-cols-[auto_1fr] items-start gap-2.5 rounded-[10px] border px-2.5 py-1.5 text-left transition-colors",
                 item.done ? "border-line bg-transparent" : "border-[#1f9d74]/40 bg-raise hover:border-[#1f9d74]",
