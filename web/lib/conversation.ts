@@ -1,3 +1,4 @@
+import type { PersonaId } from "./personas";
 import type { Chart, IdentifyResult } from "./types";
 
 // The conversation model: agent SSE events are folded into turns the UI renders.
@@ -10,7 +11,8 @@ export type Block =
   | { kind: "table"; id: string; title?: string; columns: string[]; rows: (string | null)[][] }
   | { kind: "chart"; id: string; spec: string };
 
-export type UserTurn = { id: string; role: "user"; text: string };
+/** `sent` is what the agent sees when it differs from what the user typed (team tags, protocol). */
+export type UserTurn = { id: string; role: "user"; text: string; sent?: string; persona?: PersonaId; auto?: boolean };
 
 export type AssistantTurn = {
   id: string;
@@ -22,6 +24,7 @@ export type AssistantTurn = {
   patient?: Chart;
   content?: unknown[];
   error?: string;
+  replyTo?: PersonaId;
 };
 
 export type Turn = UserTurn | AssistantTurn;
@@ -38,6 +41,9 @@ const RUNNING: Record<string, string> = {
   ask_data: "Reading the ER data model",
   system_execute_sql: "Querying Snowflake",
   data_to_chart: "Drawing chart",
+  get_er_brief: "Writing the ER brief",
+  confirm_identity: "Confirming identity",
+  search_patient_events: "Searching the patient's history",
 };
 
 function doneLabel(tool: string, result: unknown): string {
@@ -54,6 +60,9 @@ function doneLabel(tool: string, result: unknown): string {
   if (tool === "system_execute_sql") return "Queried Snowflake";
   if (tool === "ask_data") return "Read the ER data model";
   if (tool === "data_to_chart") return "Drew chart";
+  if (tool === "get_er_brief") return "Wrote the ER brief";
+  if (tool === "confirm_identity") return "Checked identity";
+  if (tool === "search_patient_events") return "Searched the patient's history";
   return tool;
 }
 
@@ -167,7 +176,7 @@ export function toMessages(turns: Turn[]) {
         i++;
         continue;
       }
-      messages.push({ role: "user", content: [{ type: "text", text: turn.text }] });
+      messages.push({ role: "user", content: [{ type: "text", text: turn.sent ?? turn.text }] });
     } else if (turn.content) {
       messages.push({ role: "assistant", content: turn.content });
     }
@@ -218,15 +227,72 @@ export async function streamAgent(
   }
 }
 
+export type Handoff = { to: PersonaId; priority: "critical" | "high" | "routine"; title: string; summary: string };
+export type TaskList = { to: PersonaId; items: { task: string; why?: string }[] };
+export type Catch = { kind: "safety" | "time" | "cost" | "research"; text: string };
+
+export type Directives = { body: string; options: string[]; handoffs: Handoff[]; tasks: TaskList[]; catches: Catch[] };
+
+const DIRECTIVE = /```(options|handoff|tasks|catches)\s*([\s\S]*?)```/g;
+const PERSONA_IDS = ["paramedic", "doctor", "nurse"];
+const CATCH_KINDS = ["safety", "time", "cost", "research"];
+
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw.trim());
+  } catch {
+    return undefined;
+  }
+}
+
+const list = (v: unknown) => (Array.isArray(v) ? v : v && typeof v === "object" ? [v] : []);
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+/** Pulls the fenced coordination blocks (options, handoff, tasks, catches) out of a reply. Malformed blocks are dropped. */
+export function parseDirectives(text: string): Directives {
+  const out: Directives = { body: "", options: [], handoffs: [], tasks: [], catches: [] };
+  out.body = text
+    .replace(DIRECTIVE, (_, kind: string, raw: string) => {
+      const value = parseJson(raw);
+      if (kind === "options") out.options.push(...list(value).map(String));
+      if (kind === "handoff")
+        for (const h of list(value) as Record<string, unknown>[]) {
+          const to = str(h.to).toLowerCase();
+          if (!PERSONA_IDS.includes(to) || !str(h.title)) continue;
+          const priority = ["critical", "high", "routine"].includes(str(h.priority)) ? str(h.priority) : "high";
+          out.handoffs.push({ to: to as PersonaId, priority: priority as Handoff["priority"], title: str(h.title), summary: str(h.summary) });
+        }
+      if (kind === "tasks")
+        for (const t of list(value) as Record<string, unknown>[]) {
+          const to = str(t.to).toLowerCase() || "nurse";
+          const items = list(t.items)
+            .map((i) => (typeof i === "string" ? { task: i } : { task: str((i as Record<string, unknown>).task), why: str((i as Record<string, unknown>).why) || undefined }))
+            .filter((i) => i.task);
+          if (PERSONA_IDS.includes(to) && items.length) out.tasks.push({ to: to as PersonaId, items });
+        }
+      if (kind === "catches")
+        for (const c of list(value) as Record<string, unknown>[]) {
+          const kind = str(c.kind).toLowerCase();
+          if (str(c.text)) out.catches.push({ kind: (CATCH_KINDS.includes(kind) ? kind : "safety") as Catch["kind"], text: str(c.text) });
+        }
+      return "";
+    })
+    // While streaming, hide a block that has opened but not closed yet.
+    .replace(/```(options|handoff|tasks|catches)[\s\S]*$/, "")
+    // The team tags are for the agent; drop one if it echoes it back.
+    .replace(/^\s*\[(Paramedic|Doctor|Nurse|Monitor)[^\]]*\]\s*/i, "")
+    .trim();
+  return out;
+}
+
 /** Splits a reply into its markdown and the quick replies in a trailing ```options block. */
 export function splitOptions(text: string): { body: string; options: string[] } {
-  const match = text.match(/```options\s*([\s\S]*?)```/);
-  if (!match) return { body: text.split("```options")[0], options: [] };
-  let options: string[] = [];
-  try {
-    options = JSON.parse(match[1]);
-  } catch {
-    options = [];
-  }
-  return { body: text.replace(match[0], "").trim(), options: Array.isArray(options) ? options.map(String) : [] };
+  const { body, options } = parseDirectives(text);
+  return { body, options };
+}
+
+/** Every directive in a finished or streaming assistant turn, across its text blocks. */
+export function turnDirectives(turn: AssistantTurn): Directives {
+  const text = turn.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("\n\n");
+  return parseDirectives(text);
 }

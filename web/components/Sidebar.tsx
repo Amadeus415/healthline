@@ -1,6 +1,7 @@
 "use client";
 
-import { BarChart3, LayoutGrid, Moon, PanelLeft, Plus, Sun } from "lucide-react";
+import { BarChart3, Columns3, LayoutGrid, Moon, PanelLeft, Plus, Sun } from "lucide-react";
+import Link from "next/link";
 import clsx from "clsx";
 import { Mark } from "./Mark";
 import type { Bay } from "@/lib/types";
@@ -54,6 +55,11 @@ export function Sidebar({ bays, boardError, cases, activeCaseId, theme, onNew, o
         >
           Population
         </NavButton>
+        <Link href="/team" className="flex items-center gap-3 rounded-[9px] px-2.5 py-[9px] text-[15px] font-normal hover:bg-line">
+          <Columns3 className="size-[18px]" strokeWidth={1.5} />
+          Team view
+          <span className="ml-auto font-mono text-[10px] tracking-[.06em] text-mute uppercase">3 personas</span>
+        </Link>
       </nav>
 
       <div className="label flex items-center gap-1.5 px-5 pt-5 pb-1.5">

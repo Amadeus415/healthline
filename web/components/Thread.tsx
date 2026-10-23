@@ -12,7 +12,7 @@ import type { Candidate, IdentifyResult } from "@/lib/types";
 
 const ease = [0.2, 0.7, 0.2, 1] as const;
 
-export function Thread({ turns, busy, onReply }: { turns: Turn[]; busy: boolean; onReply: (text: string) => void }) {
+export function Thread({ turns, busy, onReply, dense }: { turns: Turn[]; busy: boolean; onReply: (text: string) => void; dense?: boolean }) {
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
 
@@ -32,7 +32,13 @@ export function Thread({ turns, busy, onReply }: { turns: Turn[]; busy: boolean;
       last = b.data;
     }
   }
-  const lastId = turns.at(-1)?.id;
+  // Quick replies stay live on the last answer to a person; automatic monitor alarms don't make it stale.
+  let lastId: string | undefined;
+  turns.forEach((turn, i) => {
+    const prev = turns[i - 1];
+    const fromMonitor = turn.role === "user" ? turn.auto : prev?.role === "user" && prev.auto;
+    if (!fromMonitor) lastId = turn.id;
+  });
 
   return (
     <div
@@ -41,12 +47,23 @@ export function Thread({ turns, busy, onReply }: { turns: Turn[]; busy: boolean;
         const el = e.currentTarget;
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
       }}
-      className="min-h-0 flex-1 overflow-y-auto px-6 pt-9 pb-6"
+      className={clsx("min-h-0 flex-1 overflow-y-auto", dense ? "px-4 pt-4 pb-3" : "px-6 pt-9 pb-6")}
     >
-      <div className="mx-auto grid w-full max-w-[760px] gap-[34px]">
+      <div className={clsx("mx-auto grid w-full max-w-[760px]", dense ? "gap-[22px]" : "gap-[34px]")}>
         <AnimatePresence initial={false}>
           {turns.map((turn) =>
-            turn.role === "user" ? (
+            turn.role === "user" && turn.auto ? (
+              <motion.div
+                key={turn.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease }}
+                className="grid gap-1 rounded-[12px] border border-accent bg-accent-soft px-3.5 py-2.5"
+              >
+                <span className="label text-accent">Monitor alarm · raised automatically</span>
+                <span className="font-mono text-[12.5px] leading-relaxed">{turn.text}</span>
+              </motion.div>
+            ) : turn.role === "user" ? (
               <motion.div
                 key={turn.id}
                 initial={{ opacity: 0, y: 12 }}

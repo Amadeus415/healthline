@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 !.env.example
+
+# Recorded demo videos (scripts/record-demo.mjs)
+/demo-video
