@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import clsx from "clsx";
 import { Composer, type ComposerHandle } from "./Composer";
 import { Home } from "./Home";
+import { Inbound } from "./inbound/Inbound";
 import { PatientPanel } from "./PatientPanel";
 import { Sidebar } from "./Sidebar";
 import { Thread } from "./Thread";
@@ -46,6 +47,8 @@ export function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  // The ambulance workflow opens first: it's the demo. ?view=chat starts in the assistant.
+  const [view, setView] = useState<"chat" | "inbound">(() => (new URLSearchParams(location.search).get("view") === "chat" ? "chat" : "inbound"));
   const abort = useRef<AbortController | null>(null);
   const homeComposer = useRef<ComposerHandle>(null);
   const caseComposer = useRef<ComposerHandle>(null);
@@ -85,6 +88,7 @@ export function App() {
 
   const newCase = useCallback(() => {
     abort.current?.abort();
+    setView("chat");
     setActiveId(null);
     setPanelOpen(false);
     setHomeBay(bays.find((b) => !b.patient_id));
@@ -113,6 +117,7 @@ export function App() {
     let caseId = opts.caseId === undefined ? activeId : opts.caseId;
     let prior: Turn[] = cases.find((c) => c.id === caseId)?.turns ?? [];
 
+    setView("chat");
     if (!caseId) {
       const named = text.match(/\bbay (\d+)\b/i);
       const bay = opts.bay ?? bays.find((b) => named && b.bay === Number(named[1]));
@@ -164,6 +169,7 @@ export function App() {
   };
 
   const openBay = (bay: Bay) => {
+    setView("chat");
     const existing = cases.find((c) => c.bay === bay.bay);
     if (existing) {
       setActiveId(existing.id);
@@ -185,7 +191,7 @@ export function App() {
     return patient?.name ?? active.label ?? active.title;
   })();
 
-  const showPanel = panelOpen && !!patient;
+  const showPanel = panelOpen && !!patient && view === "chat";
   const sideWidth = phone || !sidebarOpen ? "0px" : narrow ? "240px" : "268px";
   const panelWidth = showPanel && !narrow ? "400px" : "0px";
 
@@ -201,10 +207,16 @@ export function App() {
             boardError={boardError}
             cases={cases}
             activeCaseId={activeId}
+            inbound={view === "inbound"}
             theme={theme}
             onNew={newCase}
+            onInbound={() => {
+              setView("inbound");
+              setPanelOpen(false);
+            }}
             onBay={openBay}
             onCase={(id) => {
+              setView("chat");
               setActiveId(id);
               setPanelOpen(false);
             }}
@@ -216,6 +228,10 @@ export function App() {
       </div>
 
       <main className="relative flex min-h-0 min-w-0 flex-col">
+        <div className={clsx("flex min-h-0 flex-1 flex-col", view !== "inbound" && "hidden")}>
+          <Inbound active={view === "inbound"} sidebarHidden={!sidebarOpen || phone} onShowSidebar={() => setSidebarOpen(true)} />
+        </div>
+        <div className={clsx("flex min-h-0 flex-1 flex-col", view !== "chat" && "hidden")}>
         <header className={clsx("flex h-[58px] flex-none items-center gap-4 border-b px-6 transition-colors", active ? "border-line" : "border-transparent")}>
           {(!sidebarOpen || phone) && (
             <button onClick={() => setSidebarOpen(true)} title="Show sidebar" className="rounded-[9px] p-2 text-mute hover:bg-line hover:text-ink">
@@ -267,6 +283,7 @@ export function App() {
         ) : (
           <Home ref={homeComposer} bay={homeBay?.bay} onSend={(text) => send(text, { caseId: null, bay: homeBay && !/\bbay \d+\b/i.test(text) && !/^who|^how|^chart|^brief/i.test(text) ? homeBay : undefined })} />
         )}
+        </div>
       </main>
 
       <aside

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, LayoutGrid, Moon, PanelLeft, Plus, Sun } from "lucide-react";
+import { Ambulance, BarChart3, LayoutGrid, Moon, PanelLeft, Plus, Sun } from "lucide-react";
 import clsx from "clsx";
 import { Mark } from "./Mark";
 import type { Bay } from "@/lib/types";
@@ -12,8 +12,10 @@ type Props = {
   boardError?: string;
   cases: CaseSummary[];
   activeCaseId: string | null;
+  inbound: boolean;
   theme: "light" | "dark";
   onNew: () => void;
+  onInbound: () => void;
   onBay: (bay: Bay) => void;
   onCase: (id: string) => void;
   onPrompt: (text: string) => void;
@@ -21,8 +23,8 @@ type Props = {
   onCollapse: () => void;
 };
 
-export function Sidebar({ bays, boardError, cases, activeCaseId, theme, onNew, onBay, onCase, onPrompt, onTheme, onCollapse }: Props) {
-  const activeBay = cases.find((c) => c.id === activeCaseId)?.bay;
+export function Sidebar({ bays, boardError, cases, activeCaseId, inbound, theme, onNew, onInbound, onBay, onCase, onPrompt, onTheme, onCollapse }: Props) {
+  const activeBay = inbound ? undefined : cases.find((c) => c.id === activeCaseId)?.bay;
   const recent = cases.filter((c) => c.bay === undefined || !bays.some((b) => b.bay === c.bay)).slice(0, 8);
 
   return (
@@ -41,6 +43,17 @@ export function Sidebar({ bays, boardError, cases, activeCaseId, theme, onNew, o
         <NavButton onClick={onNew} className="mb-1.5 bg-line" icon={<Plus className="size-[18px]" strokeWidth={1.5} />}>
           New case
           <kbd className="ml-auto font-mono text-[10px] tracking-[.06em] text-mute">⌘K</kbd>
+        </NavButton>
+        <NavButton
+          onClick={onInbound}
+          className={clsx(inbound && "bg-raise shadow-[inset_0_0_0_1px_var(--line)] hover:bg-raise")}
+          icon={<Ambulance className="size-[18px]" strokeWidth={1.5} />}
+        >
+          Inbound
+          <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[.06em] text-accent uppercase">
+            <span className="size-1.5 animate-[pulse-dot_1.4s_infinite] rounded-full bg-accent" />
+            Medic 14
+          </span>
         </NavButton>
         <NavButton onClick={() => onPrompt("Who is on the ER board right now?")} icon={<LayoutGrid className="size-[18px]" strokeWidth={1.5} />}>
           ER board
@@ -65,15 +78,18 @@ export function Sidebar({ bays, boardError, cases, activeCaseId, theme, onNew, o
         {bays.map((b) => (
           <button
             key={b.bay}
-            onClick={() => onBay(b)}
+            onClick={() => (b.status === "Inbound" ? onInbound() : onBay(b))}
             className={clsx(
               "grid grid-cols-[auto_1fr] items-baseline gap-x-2 rounded-[9px] px-2.5 py-2 text-left text-[14px] font-light hover:bg-line",
-              activeBay === b.bay && "bg-raise shadow-[inset_0_0_0_1px_var(--line)] hover:bg-raise",
+              (activeBay === b.bay || (inbound && b.status === "Inbound")) && "bg-raise shadow-[inset_0_0_0_1px_var(--line)] hover:bg-raise",
             )}
           >
             <span className={clsx("inline-block size-1.5 -translate-y-px rounded-full", b.acuity <= 2 ? "bg-accent" : "bg-edge")} />
             <span className="truncate">
-              Bay {b.bay} <span className="text-mute">· {b.patient_id ? b.chief_complaint.toLowerCase() : "unidentified"}</span>
+              Bay {b.bay}{" "}
+              <span className={clsx(b.status === "Inbound" ? "text-accent" : "text-mute")}>
+                · {b.status === "Inbound" ? "inbound, head strike" : b.patient_id ? b.chief_complaint.toLowerCase() : "unidentified"}
+              </span>
             </span>
           </button>
         ))}

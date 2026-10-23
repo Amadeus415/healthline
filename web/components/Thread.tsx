@@ -7,6 +7,8 @@ import { Mark } from "./Mark";
 import { Markdown } from "./Markdown";
 import { Candidates, Funnel, ResultTable, Trace } from "./Blocks";
 import { VegaChart } from "./VegaChart";
+import { BriefView } from "./inbound/Brief";
+import { EventsView } from "./inbound/parts";
 import { splitOptions, type AssistantTurn, type Turn } from "@/lib/conversation";
 import type { Candidate, IdentifyResult } from "@/lib/types";
 
@@ -101,6 +103,8 @@ function AssistantMessage({
         if (b.kind === "identify") return <IdentifyView key={b.id} data={b.data} previous={previousOf.get(b.id)} />;
         if (b.kind === "table") return charted ? null : <ResultTable key={b.id} columns={b.columns} rows={b.rows} title={b.title} />;
         if (b.kind === "chart") return <VegaChart key={b.id} spec={b.spec} />;
+        if (b.kind === "events") return <EventsView key={b.id} data={b.data} />;
+        if (b.kind === "brief") return <BriefView key={b.id} brief={b.data} compact />;
         const streamingThis = running && b === lastText;
         const { body, options } = splitOptions(b.text);
         if (!options.length) return body.trim() ? <Markdown key={b.index} text={body.trim()} streaming={streamingThis} /> : null;

@@ -1,4 +1,4 @@
-import type { Chart, IdentifyResult } from "./types";
+import type { Brief, Chart, EventsResult, IdentifyResult } from "./types";
 
 // The conversation model: agent SSE events are folded into turns the UI renders.
 
@@ -8,9 +8,12 @@ export type Block =
   | { kind: "text"; index: number; text: string }
   | { kind: "identify"; id: string; data: IdentifyResult }
   | { kind: "table"; id: string; title?: string; columns: string[]; rows: (string | null)[][] }
-  | { kind: "chart"; id: string; spec: string };
+  | { kind: "chart"; id: string; spec: string }
+  | { kind: "events"; id: string; data: EventsResult }
+  | { kind: "brief"; id: string; data: Brief };
 
-export type UserTurn = { id: string; role: "user"; text: string };
+/** context is sent to the agent ahead of the text but not shown, e.g. who the patient is. */
+export type UserTurn = { id: string; role: "user"; text: string; context?: string };
 
 export type AssistantTurn = {
   id: string;
@@ -35,6 +38,8 @@ export function newAssistantTurn(): AssistantTurn {
 const RUNNING: Record<string, string> = {
   identify_patient: "Searching patients",
   get_patient_chart: "Building chart",
+  get_er_brief: "Pulling the record together",
+  search_patient_events: "Searching every care site",
   ask_data: "Reading the ER data model",
   system_execute_sql: "Querying Snowflake",
   data_to_chart: "Drawing chart",
@@ -50,6 +55,16 @@ function doneLabel(tool: string, result: unknown): string {
     if ((result as { error?: string }).error) return "No chart found";
     const n = (result as Chart).care_sites?.length ?? 0;
     return `Built chart from ${n} care site${n === 1 ? "" : "s"}`;
+  }
+  if (tool === "get_er_brief") {
+    const b = result as Brief;
+    if (b.error) return "No record found";
+    return `Unified ${b.visits_total} visits from ${b.sites.length} care sites`;
+  }
+  if (tool === "search_patient_events") {
+    const r = result as EventsResult;
+    const n = r.care_sites_searched.length;
+    return `Searched ${r.total.toLocaleString()} record${r.total === 1 ? "" : "s"} across ${n} care site${n === 1 ? "" : "s"}`;
   }
   if (tool === "system_execute_sql") return "Queried Snowflake";
   if (tool === "ask_data") return "Read the ER data model";
@@ -105,6 +120,8 @@ export function applyEvent(turn: AssistantTurn, event: string, data: Record<stri
       if (!ok || !result) return t;
       if (tool === "identify_patient") t.blocks.push({ kind: "identify", id: data.tool_use_id as string, data: result as IdentifyResult });
       if (tool === "get_patient_chart" && !(result as { error?: string }).error) t.patient = result as Chart;
+      if (tool === "get_er_brief" && !(result as Brief).error) t.blocks.push({ kind: "brief", id: data.tool_use_id as string, data: result as Brief });
+      if (tool === "search_patient_events") t.blocks.push({ kind: "events", id: data.tool_use_id as string, data: result as EventsResult });
       if (tool === "system_execute_sql") {
         const rs = (result as { result_set?: ResultSet }).result_set;
         if (rs && rs.data.length > 1) t.blocks.push(tableBlock(data.tool_use_id as string, rs));
@@ -167,7 +184,7 @@ export function toMessages(turns: Turn[]) {
         i++;
         continue;
       }
-      messages.push({ role: "user", content: [{ type: "text", text: turn.text }] });
+      messages.push({ role: "user", content: [{ type: "text", text: turn.context ? `${turn.context}\n\n${turn.text}` : turn.text }] });
     } else if (turn.content) {
       messages.push({ role: "assistant", content: turn.content });
     }
