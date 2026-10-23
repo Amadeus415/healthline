@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useMedia } from "./App";
-import { CatchStrip } from "./CatchStrip";
 import { Mark } from "./Mark";
 import { PatientPanel } from "./PatientPanel";
 import { PersonaColumn, type InboxItem } from "./PersonaColumn";
@@ -17,7 +16,7 @@ import { FIELD_REPORT, ORDER, PERSONAS, tagged, type PersonaId } from "@/lib/per
 import { LAST_TICK, TICK_MS, bp, checkTriggers, vitalsAt, vitalsLine, type Vitals } from "@/lib/vitals";
 
 // One case, one agent conversation, three people. Each column shows what its persona said and what
-// Healthline said back; handoffs, tasks and catches in any reply are routed to the right column.
+// Healthline said back; handoffs and tasks in any reply are routed to the right column.
 
 type Note = { id: string; to: PersonaId; from: PersonaId; title: string; at: number };
 type Saved = { turns: Turn[]; done: string[]; notes: Note[]; seen: Record<PersonaId, number> };
@@ -119,8 +118,6 @@ export function TeamApp() {
   const routed = useMemo(() => {
     const inbox: Record<PersonaId, InboxItem[]> = { paramedic: [], doctor: [], nurse: [] };
     const ready: ReadyItem[] = [];
-    const catches: { id: string; kind: "safety" | "time" | "cost" | "research"; text: string }[] = [];
-    const caught = new Set<string>();
     const asked = new Set<string>();
     for (const turn of turns) {
       if (turn.role !== "assistant") continue;
@@ -143,15 +140,9 @@ export function TeamApp() {
           ready.push({ id, task: item.task, why: item.why, done: done.includes(id) });
         }),
       );
-      d.catches.forEach((c, i) => {
-        const key = c.text.toLowerCase().slice(0, 60);
-        if (caught.has(key)) return;
-        caught.add(key);
-        catches.push({ id: `${turn.id}-c${i}`, ...c });
-      });
     }
     for (const n of notes) inbox[n.to].push({ id: n.id, from: PERSONAS[n.from].name, priority: "routine", title: n.title, at: n.at });
-    return { inbox, ready, catches };
+    return { inbox, ready };
   }, [turns, done, notes]);
 
   // Alert a column when something new lands in its inbox.
@@ -341,18 +332,6 @@ export function TeamApp() {
           <Mark className="size-[20px]" />
           Healthline
         </Link>
-        <span className="label rounded-full border border-line px-2.5 py-1">Team</span>
-        <div className="min-w-0 truncate text-[15px]">
-          <span className="text-mute">Unit 12 inbound · Bay 4</span>
-          <AnimatePresence>
-            {patient && (
-              <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}>
-                <span className="mx-1.5 text-mute">→</span>
-                most likely <span className="font-normal">{patient.name}</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
         <div className="ml-auto flex items-center gap-1.5 text-mute">
           {vitals.length > 0 && (
             <span className={clsx("mr-2 font-mono text-[12px] tabular-nums", vitals.at(-1)!.sbp < 90 ? "text-accent" : "text-ink")}>
@@ -371,8 +350,6 @@ export function TeamApp() {
           </button>
         </div>
       </header>
-
-      <CatchStrip catches={routed.catches} />
 
       {narrow && (
         <nav className="flex flex-none border-b border-line">
