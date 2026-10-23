@@ -74,7 +74,10 @@ type Binding = string | number | null;
 /** Runs one statement through the SQL API and returns rows as objects keyed by lowercase column. */
 export async function sql<T = Record<string, unknown>>(statement: string, binds: Binding[] = []): Promise<T[]> {
   const bindings = Object.fromEntries(
-    binds.map((v, i) => [String(i + 1), { type: typeof v === "number" ? "FIXED" : "TEXT", value: v === null ? null : String(v) }]),
+    binds.map((v, i) => [
+      String(i + 1),
+      { type: typeof v === "number" ? (Number.isInteger(v) ? "FIXED" : "REAL") : "TEXT", value: v === null ? null : String(v) },
+    ]),
   );
   const res = await fetch(`${host}/api/v2/statements`, {
     method: "POST",
