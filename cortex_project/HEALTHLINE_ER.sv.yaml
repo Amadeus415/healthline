@@ -1,0 +1,333 @@
+name: HEALTHLINE_ER
+description: 'ER assistant data for Healthline: patient profiles (one row per patient, as of 2024-11-01), the live ER board, visits with care site names, medication orders and diagnoses across 12 US metro areas of synthetic Synthea data.'
+tables:
+  - name: PATIENT_PROFILE
+    description: 'One row per patient: demographics, latest vitals, active meds and conditions, allergies, visits and identifying marks, as of 2024-11-01.'
+    base_table:
+      database: HEALTHLINE
+      schema: GOLD
+      table: PATIENT_PROFILE
+    primary_key:
+      columns:
+        - PATIENT_ID
+    dimensions:
+      - name: PATIENT_ID
+        expr: PATIENT_ID
+        data_type: NUMBER
+      - name: FULL_NAME
+        expr: FULL_NAME
+        data_type: VARCHAR
+      - name: GENDER
+        expr: GENDER
+        data_type: VARCHAR
+      - name: IS_ALIVE
+        expr: IS_ALIVE
+        data_type: BOOLEAN
+      - name: AGE
+        expr: AGE
+        data_type: NUMBER
+        description: Age in years as of 2024-11-01, when the data ends.
+      - name: CITY
+        expr: CITY
+        data_type: VARCHAR
+      - name: STATE
+        expr: STATE
+        data_type: VARCHAR
+      - name: ZIP
+        expr: ZIP
+        data_type: NUMBER
+      - name: SYNTHEA_CITY
+        expr: SYNTHEA_CITY
+        data_type: VARCHAR
+        description: Metro area the patient belongs to, uppercase, e.g. CLEVELAND, CHICAGO, BOSTON.
+        sample_values:
+          - CLEVELAND
+          - CHICAGO
+          - AUSTIN
+          - SAN FRANCISCO
+          - BOSTON
+      - name: ON_BLOOD_THINNER
+        expr: ON_BLOOD_THINNER
+        data_type: BOOLEAN
+        description: Active anticoagulant or antiplatelet (clopidogrel, warfarin, apixaban, rivaroxaban, heparin, prasugrel, ticagrelor).
+      - name: ON_INSULIN
+        expr: ON_INSULIN
+        data_type: BOOLEAN
+      - name: ON_BETA_BLOCKER
+        expr: ON_BETA_BLOCKER
+        data_type: BOOLEAN
+      - name: ON_OPIOID
+        expr: ON_OPIOID
+        data_type: BOOLEAN
+      - name: HAS_SEVERE_ALLERGY
+        expr: HAS_SEVERE_ALLERGY
+        data_type: BOOLEAN
+      - name: TOTAL_VISITS
+        expr: TOTAL_VISITS
+        data_type: NUMBER
+      - name: ER_VISITS
+        expr: ER_VISITS
+        data_type: NUMBER
+      - name: INPATIENT_STAYS
+        expr: INPATIENT_STAYS
+        data_type: NUMBER
+    time_dimensions:
+      - name: BIRTHDATE
+        expr: BIRTHDATE
+        data_type: DATE
+      - name: LAST_VISIT
+        expr: LAST_VISIT
+        data_type: DATE
+      - name: LAST_ER_VISIT
+        expr: LAST_ER_VISIT
+        data_type: DATE
+    facts:
+      - name: HEIGHT_CM
+        expr: HEIGHT_CM
+        data_type: FLOAT
+      - name: WEIGHT_KG
+        expr: WEIGHT_KG
+        data_type: FLOAT
+      - name: HEART_RATE
+        expr: HEART_RATE
+        data_type: FLOAT
+      - name: BMI
+        expr: BMI
+        data_type: FLOAT
+    metrics:
+      - name: PATIENT_COUNT
+        description: Number of distinct patients.
+        expr: COUNT(DISTINCT PATIENT_ID)
+  - name: ER_BOARD
+    description: 'Who is in the emergency department now: bay, complaint, acuity (ESI 1 most urgent) and patient.'
+    base_table:
+      database: HEALTHLINE
+      schema: GOLD
+      table: ER_BOARD
+    primary_key:
+      columns:
+        - BAY
+    dimensions:
+      - name: BAY
+        expr: BAY
+        data_type: NUMBER
+      - name: PATIENT_ID
+        expr: PATIENT_ID
+        data_type: NUMBER
+        description: Null while the patient is unidentified.
+      - name: PATIENT
+        expr: PATIENT
+        data_type: VARCHAR
+      - name: AGE
+        expr: AGE
+        data_type: NUMBER
+      - name: GENDER
+        expr: GENDER
+        data_type: VARCHAR
+      - name: CHIEF_COMPLAINT
+        expr: CHIEF_COMPLAINT
+        data_type: VARCHAR
+      - name: ACUITY
+        expr: ACUITY
+        data_type: NUMBER
+        description: 'Emergency Severity Index: 1 is most urgent, 5 least.'
+      - name: STATUS
+        expr: STATUS
+        data_type: VARCHAR
+      - name: ON_BLOOD_THINNER
+        expr: ON_BLOOD_THINNER
+        data_type: BOOLEAN
+      - name: HAS_SEVERE_ALLERGY
+        expr: HAS_SEVERE_ALLERGY
+        data_type: BOOLEAN
+    time_dimensions:
+      - name: ARRIVED_AT
+        expr: ARRIVED_AT
+        data_type: TIMESTAMP_LTZ
+  - name: ENCOUNTERS
+    description: Every visit with its care site name (from the Data Vault organization satellite).
+    base_table:
+      database: HEALTHLINE
+      schema: GOLD
+      table: ENCOUNTERS
+    dimensions:
+      - name: ENCOUNTER_ID
+        expr: ENCOUNTER_ID
+        data_type: NUMBER
+      - name: PATIENT_ID
+        expr: PATIENT_ID
+        data_type: NUMBER
+      - name: ENCOUNTER_CLASS
+        expr: ENCOUNTER_CLASS
+        data_type: VARCHAR
+        synonyms:
+          - visit type
+          - ER visit
+          - ED visit
+        description: Visit type. 'emergency' means an ER visit.
+        sample_values:
+          - emergency
+          - inpatient
+          - ambulatory
+          - outpatient
+          - wellness
+          - urgentcare
+      - name: DESCRIPTION
+        expr: DESCRIPTION
+        data_type: VARCHAR
+      - name: REASON
+        expr: REASON
+        data_type: VARCHAR
+      - name: CARE_SITE
+        expr: CARE_SITE
+        data_type: VARCHAR
+      - name: SYNTHEA_CITY
+        expr: SYNTHEA_CITY
+        data_type: VARCHAR
+    time_dimensions:
+      - name: ENCOUNTER_START
+        expr: ENCOUNTER_START
+        data_type: TIMESTAMP_NTZ
+      - name: ENCOUNTER_STOP
+        expr: ENCOUNTER_STOP
+        data_type: TIMESTAMP_NTZ
+    facts:
+      - name: TOTAL_CLAIM_COST
+        expr: TOTAL_CLAIM_COST
+        data_type: NUMBER
+    primary_key:
+      columns:
+        - ENCOUNTER_ID
+    metrics:
+      - name: VISIT_COUNT
+        description: Number of visits (encounters).
+        expr: COUNT(ENCOUNTER_ID)
+  - name: MEDICATIONS
+    description: Medication orders. Active means no stop date or stopped on or after 2024-10-01.
+    base_table:
+      database: HEALTHLINE
+      schema: GOLD
+      table: MEDICATIONS
+    dimensions:
+      - name: MEDICATION_ID
+        expr: MEDICATION_ID
+        data_type: NUMBER
+      - name: PATIENT_ID
+        expr: PATIENT_ID
+        data_type: NUMBER
+      - name: MEDICATION
+        expr: MEDICATION
+        data_type: VARCHAR
+      - name: REASON
+        expr: REASON
+        data_type: VARCHAR
+      - name: IS_ACTIVE
+        expr: IS_ACTIVE
+        data_type: BOOLEAN
+      - name: SYNTHEA_CITY
+        expr: SYNTHEA_CITY
+        data_type: VARCHAR
+    time_dimensions:
+      - name: MED_START
+        expr: MED_START
+        data_type: TIMESTAMP_NTZ
+      - name: MED_STOP
+        expr: MED_STOP
+        data_type: TIMESTAMP_NTZ
+    primary_key:
+      columns:
+        - MEDICATION_ID
+  - name: CONDITIONS
+    description: Diagnoses. Active means no stop date.
+    base_table:
+      database: HEALTHLINE
+      schema: GOLD
+      table: CONDITIONS
+    dimensions:
+      - name: CONDITION_ID
+        expr: CONDITION_ID
+        data_type: NUMBER
+      - name: PATIENT_ID
+        expr: PATIENT_ID
+        data_type: NUMBER
+      - name: CONDITION
+        expr: CONDITION
+        data_type: VARCHAR
+      - name: IS_ACTIVE
+        expr: IS_ACTIVE
+        data_type: BOOLEAN
+      - name: SYNTHEA_CITY
+        expr: SYNTHEA_CITY
+        data_type: VARCHAR
+    time_dimensions:
+      - name: CONDITION_START
+        expr: CONDITION_START
+        data_type: DATE
+      - name: CONDITION_STOP
+        expr: CONDITION_STOP
+        data_type: DATE
+    primary_key:
+      columns:
+        - CONDITION_ID
+verified_queries:
+  - name: 0;1
+    question: Who is in the ER with a severe allergy?
+    sql: SELECT BAY, PATIENT, CHIEF_COMPLAINT, STATUS, ACUITY FROM er_board WHERE HAS_SEVERE_ALLERGY ORDER BY ACUITY, BAY
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+  - name: 1;1
+    question: Who is on the ER board right now?
+    sql: SELECT BAY, PATIENT, AGE, CHIEF_COMPLAINT, ACUITY, STATUS, ARRIVED_AT FROM er_board ORDER BY ACUITY, ARRIVED_AT
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+  - name: 2;1
+    question: Has patient 1805238 had any ER visits before?
+    sql: SELECT ER_VISITS, INPATIENT_STAYS, TOTAL_VISITS, LAST_ER_VISIT, LAST_VISIT FROM patient_profile WHERE PATIENT_ID = 1805238
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+  - name: 3;1
+    question: How many ER visits were there each month in Cleveland during 2024?
+    sql: SELECT DATE_TRUNC('MONTH', ENCOUNTER_START) AS month, COUNT(*) AS er_visits FROM encounters WHERE ENCOUNTER_CLASS = 'emergency' AND SYNTHEA_CITY = 'CLEVELAND' AND ENCOUNTER_START >= '2024-01-01' GROUP BY 1 ORDER BY 1
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+  - name: 4;1
+    question: Which hospitals or care sites had the highest number of emergency room visits in 2024?
+    sql: SELECT CARE_SITE, COUNT(*) AS er_visits FROM encounters WHERE ENCOUNTER_CLASS = 'emergency' AND ENCOUNTER_START >= '2024-01-01' GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+  - name: 5;1
+    question: How many living patients in Cleveland are on blood thinners?
+    sql: SELECT COUNT(*) AS patients FROM patient_profile WHERE IS_ALIVE AND SYNTHEA_CITY = 'CLEVELAND' AND ON_BLOOD_THINNER
+    verified_at: 1792784410
+    verified_by: Semantic Model Generator
+relationships:
+  - name: ER_BOARD_TO_PATIENT
+    left_table: ER_BOARD
+    right_table: PATIENT_PROFILE
+    join_type: left_outer
+    relationship_columns:
+      - left_column: PATIENT_ID
+        right_column: PATIENT_ID
+  - name: ENCOUNTERS_TO_PATIENT
+    left_table: ENCOUNTERS
+    right_table: PATIENT_PROFILE
+    join_type: left_outer
+    relationship_columns:
+      - left_column: PATIENT_ID
+        right_column: PATIENT_ID
+  - name: MEDICATIONS_TO_PATIENT
+    left_table: MEDICATIONS
+    right_table: PATIENT_PROFILE
+    join_type: left_outer
+    relationship_columns:
+      - left_column: PATIENT_ID
+        right_column: PATIENT_ID
+  - name: CONDITIONS_TO_PATIENT
+    left_table: CONDITIONS
+    right_table: PATIENT_PROFILE
+    join_type: left_outer
+    relationship_columns:
+      - left_column: PATIENT_ID
+        right_column: PATIENT_ID
+module_custom_instructions:
+  sql_generation: The data ends on 2024-11-01; treat that as today for relative dates such as 'last year' or 'recently'. City filters use SYNTHEA_CITY in uppercase. Never return SSNs or addresses.

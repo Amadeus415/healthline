@@ -1,0 +1,12 @@
+version: 1
+artifacts:
+  - path: HEALTHLINE_ER.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: HEALTHLINE.GOLD.HEALTHLINE_ER
+  - path: ER_ASSISTANT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: HEALTHLINE.GOLD.ER_ASSISTANT
