@@ -26,7 +26,7 @@ function Spark({ series, bad }: { series: number[]; bad: boolean }) {
   const points = recent.map((v, i) => `${(i / Math.max(recent.length - 1, 1)) * 100},${22 - ((v - min) / span) * 20}`).join(" ");
   return (
     <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="h-3.5 w-full">
-      <polyline points={points} fill="none" strokeWidth={1.4} vectorEffect="non-scaling-stroke" className={bad ? "stroke-accent" : "stroke-mute"} />
+      <polyline points={points} fill="none" strokeWidth={1.4} vectorEffect="non-scaling-stroke" className={bad ? "stroke-danger" : "stroke-mute"} />
     </svg>
   );
 }
@@ -41,10 +41,10 @@ export function VitalsMonitor({ history, running, fast, alarms, onToggle, onFast
   return (
     <div className="flex-none border-b border-line px-3 py-2">
       <div className="mb-1.5 flex items-center gap-2">
-        <span className={clsx("size-1.5 rounded-full", running ? "animate-[pulse-dot_1s_infinite] bg-accent" : "bg-mute")} />
+        <span className={clsx("size-1.5 rounded-full", running ? "animate-[pulse-dot_1s_infinite] bg-danger" : "bg-mute")} />
         <span className="label">Live monitor · Unit 12</span>
         <div className="ml-auto flex items-center gap-0.5 text-mute">
-          <button onClick={onFast} title={fast ? "Normal speed" : "Speed up the feed"} className={clsx("rounded-md p-1.5 hover:bg-line hover:text-ink", fast && "text-accent")}>
+          <button onClick={onFast} title={fast ? "Normal speed" : "Speed up the feed"} className={clsx("rounded-md p-1.5 hover:bg-line hover:text-ink", fast && "text-danger")}>
             <FastForward className="size-3.5" strokeWidth={1.8} />
           </button>
           <button onClick={onToggle} title={running ? "Pause feed" : "Resume feed"} className="rounded-md p-1.5 hover:bg-line hover:text-ink">
@@ -54,12 +54,12 @@ export function VitalsMonitor({ history, running, fast, alarms, onToggle, onFast
       </div>
       <div className="grid grid-cols-4 gap-2">
         {list.map((r) => (
-          <div key={r.label} className={clsx("rounded-[9px] border px-2 pt-1 pb-0.5 transition-colors", r.bad ? "border-accent/50 bg-accent-soft" : "border-line bg-raise")}>
+          <div key={r.label} className={clsx("rounded-[9px] border px-2 pt-1 pb-0.5 transition-colors", r.bad ? "border-danger/50 bg-danger-soft" : "border-line bg-raise")}>
             <div className="flex items-baseline justify-between">
               <span className="label">{r.label}</span>
-              {r.down && <span className="font-mono text-[10px] text-accent">▼</span>}
+              {r.down && <span className="font-mono text-[10px] text-danger">▼</span>}
             </div>
-            <div className={clsx("font-mono text-[16px] leading-tight tabular-nums", r.bad && "text-accent")}>
+            <div className={clsx("font-mono text-[16px] leading-tight tabular-nums", r.bad && "text-danger")}>
               {r.value}
               <span className="ml-0.5 text-[10px] text-mute">{r.unit}</span>
             </div>
@@ -73,9 +73,9 @@ export function VitalsMonitor({ history, running, fast, alarms, onToggle, onFast
             key={a}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-1.5 flex items-center gap-2 font-mono text-[11px] text-accent"
+            className="mt-1.5 flex items-center gap-2 font-mono text-[11px] text-danger"
           >
-            <span className="size-1.5 animate-[pulse-dot_0.8s_infinite] rounded-full bg-accent" />
+            <span className="size-1.5 animate-[pulse-dot_0.8s_infinite] rounded-full bg-danger" />
             Alarm sent to the team · {a}
           </motion.div>
         ))}

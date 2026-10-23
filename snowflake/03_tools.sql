@@ -1,4 +1,4 @@
--- Healthline agent tools. Each returns JSON that the agent reasons over and the web app
+-- HealthForce agent tools. Each returns JSON that the agent reasons over and the web app
 -- renders directly (funnel, candidates, patient chart). They run with owner's rights, so the
 -- app role needs only USAGE on the procedure, not SELECT on SILVER, the vault or sensitive data.
 

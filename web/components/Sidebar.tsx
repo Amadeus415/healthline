@@ -36,7 +36,7 @@ export function Sidebar({ bays, boardError, cases, activeCaseId, theme, persona,
       <div className="flex items-center justify-between py-[18px] pr-4 pl-5">
         <div className="flex items-center gap-2.5 font-serif text-[26px] leading-none tracking-[-.01em]">
           <Mark className="size-[22px]" />
-          Healthline
+          HealthForce
         </div>
         <button onClick={onCollapse} title="Collapse sidebar" className="rounded-lg p-[7px] text-mute hover:bg-line hover:text-ink">
           <PanelLeft className="size-[18px]" strokeWidth={1.5} />
@@ -116,7 +116,7 @@ export function Sidebar({ bays, boardError, cases, activeCaseId, theme, persona,
           <>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-2.5 bottom-full left-2.5 z-20 mb-1.5 grid gap-px rounded-[12px] border border-line bg-raise p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,.35)]">
-              <div className="label px-2.5 pt-1.5 pb-1">Use Healthline as</div>
+              <div className="label px-2.5 pt-1.5 pb-1">Use HealthForce as</div>
               {ORDER.map((id) => {
                 const p = PERSONAS[id];
                 return (

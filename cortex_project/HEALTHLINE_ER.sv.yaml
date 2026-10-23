@@ -1,5 +1,5 @@
 name: HEALTHLINE_ER
-description: 'ER assistant data for Healthline: patient profiles (one row per patient, as of 2024-11-01), the live ER board, visits with care site names, medication orders and diagnoses across 12 US metro areas of synthetic Synthea data.'
+description: 'ER assistant data for HealthForce: patient profiles (one row per patient, as of 2024-11-01), the live ER board, visits with care site names, medication orders and diagnoses across 12 US metro areas of synthetic Synthea data.'
 tables:
   - name: PATIENT_PROFILE
     description: 'One row per patient: demographics, latest vitals, active meds and conditions, allergies, visits and identifying marks, as of 2024-11-01.'

@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 const url = process.argv[2] ?? "http://localhost:3000/team";
 const outDir = process.argv[3] ?? "demo-video";
-const size = { width: 1600, height: 900 };
+const size = { width: 1920, height: 1080 };
 const AGENT_TIMEOUT = 180_000;
 
 mkdirSync(outDir, { recursive: true });
@@ -64,7 +64,7 @@ await caption("Identity narrows to one person. The doctor is alerted before the 
 await page.waitForSelector("text=Monitor alarm", { timeout: AGENT_TIMEOUT });
 await caption("Nobody asked: the monitor sees BP falling and alarms the team on its own.");
 await idle();
-await caption("The doctor gets a critical alert. The nurse gets a ready list. Catches fill the top strip.");
+await caption("The doctor gets a critical alert. The nurse gets a ready list. Nobody had to ask.");
 await pause(5000);
 
 await caption("The doctor asks what a busy team would miss, and asks for the bay to be prepared.");
@@ -86,7 +86,7 @@ await column("doctor").getByRole("button", { name: "Patient chart" }).click();
 await pause(6000);
 await column("doctor").getByRole("button", { name: "Patient chart" }).click();
 
-await caption("Safety, time, cost and research: what slips past human eyes, caught by one agent on Snowflake.");
+await caption("HealthForce: one agent on Snowflake catching what slips past a busy team.");
 await pause(5000);
 await caption("");
 await pause(800);
@@ -95,6 +95,6 @@ const video = page.video();
 await context.close();
 await browser.close();
 const raw = await video.path();
-const target = join(outDir, "healthline-team-demo.webm");
+const target = join(outDir, "healthforce-team-demo.webm");
 renameSync(raw, target);
 console.log(target);

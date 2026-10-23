@@ -13,6 +13,9 @@
   --accent: #ec4f2a;
   --accent-soft: rgba(236, 79, 42, 0.08);
   --glow: rgba(236, 79, 42, 0.16);
+  --danger: #e0372a;
+  --danger-soft: rgba(224, 55, 42, 0.09);
+  --band: #151515;
   color-scheme: light;
 }
 
@@ -27,7 +30,81 @@
   --edge: rgba(236, 235, 229, 0.32);
   --accent-soft: rgba(236, 79, 42, 0.14);
   --glow: rgba(236, 79, 42, 0.22);
+  --danger: #ff5a4a;
+  --danger-soft: rgba(255, 90, 74, 0.14);
   color-scheme: dark;
+}
+
+/* Team view: each phone gets its own palette so the three people are told apart at a glance.
+   Alarms keep --danger, so red always means danger whatever the phone's colour. */
+[data-persona="paramedic"] {
+  --paper: #eef4fc;
+  --side: #e3ecf8;
+  --raise: #ffffff;
+  --bubble: #d9e6f8;
+  --line: rgba(15, 42, 82, 0.12);
+  --edge: rgba(15, 42, 82, 0.34);
+  --accent: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, 0.09);
+  --glow: rgba(31, 111, 235, 0.18);
+  --band: #0f2a52;
+}
+[data-persona="doctor"] {
+  --paper: #fdf4ef;
+  --side: #f9e9e0;
+  --raise: #ffffff;
+  --bubble: #f6e1d6;
+  --line: rgba(90, 26, 14, 0.11);
+  --edge: rgba(90, 26, 14, 0.32);
+  --accent: #e5482a;
+  --accent-soft: rgba(229, 72, 42, 0.08);
+  --glow: rgba(229, 72, 42, 0.18);
+  --band: #5a1a0e;
+}
+[data-persona="nurse"] {
+  --paper: #ecf7f3;
+  --side: #dff1ea;
+  --raise: #ffffff;
+  --bubble: #d3eee4;
+  --line: rgba(11, 61, 51, 0.12);
+  --edge: rgba(11, 61, 51, 0.32);
+  --accent: #0e9f77;
+  --accent-soft: rgba(14, 159, 119, 0.09);
+  --glow: rgba(14, 159, 119, 0.18);
+  --band: #0b3d33;
+}
+[data-theme="dark"] [data-persona="paramedic"] {
+  --paper: #0d1522;
+  --side: #0a111c;
+  --raise: #142034;
+  --bubble: #1a2a44;
+  --line: rgba(173, 203, 245, 0.12);
+  --edge: rgba(173, 203, 245, 0.32);
+  --accent: #5b9bff;
+  --accent-soft: rgba(91, 155, 255, 0.14);
+  --band: #12305e;
+}
+[data-theme="dark"] [data-persona="doctor"] {
+  --paper: #1a0f0c;
+  --side: #140b09;
+  --raise: #24150f;
+  --bubble: #34201a;
+  --line: rgba(245, 196, 178, 0.12);
+  --edge: rgba(245, 196, 178, 0.32);
+  --accent: #ff6b4a;
+  --accent-soft: rgba(255, 107, 74, 0.14);
+  --band: #6b2112;
+}
+[data-theme="dark"] [data-persona="nurse"] {
+  --paper: #0b1714;
+  --side: #08120f;
+  --raise: #11211c;
+  --bubble: #183029;
+  --line: rgba(170, 232, 211, 0.12);
+  --edge: rgba(170, 232, 211, 0.32);
+  --accent: #2fd0a0;
+  --accent-soft: rgba(47, 208, 160, 0.14);
+  --band: #0d4a3e;
 }
 
 @theme inline {
@@ -41,6 +118,8 @@
   --color-edge: var(--edge);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;

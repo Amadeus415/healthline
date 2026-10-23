@@ -1,4 +1,4 @@
--- Healthline foundation: a warehouse, the HEALTHLINE database, and a least-privilege
+-- HealthForce foundation: a warehouse, the HEALTHLINE database, and a least-privilege
 -- service user the web app signs in as (key-pair auth, so no network policy is needed).
 -- Run as ACCOUNTADMIN. scripts/setup-keypair.sh sets the user's public key afterwards.
 
@@ -9,16 +9,16 @@ CREATE WAREHOUSE IF NOT EXISTS HEALTHLINE_WH
   AUTO_SUSPEND = 60
   AUTO_RESUME = TRUE
   INITIALLY_SUSPENDED = TRUE
-  COMMENT = 'Healthline: agent tools, Cortex Analyst and the web app';
+  COMMENT = 'HealthForce: agent tools, Cortex Analyst and the web app';
 
 CREATE DATABASE IF NOT EXISTS HEALTHLINE
-  COMMENT = 'Healthline consumption layer for the ER assistant. Built on CLINICAL_CLAIMS_DV (Data Vault) and SILVER.';
+  COMMENT = 'HealthForce consumption layer for the ER assistant. Built on CLINICAL_CLAIMS_DV (Data Vault) and SILVER.';
 
 CREATE SCHEMA IF NOT EXISTS HEALTHLINE.GOLD
   COMMENT = 'Information mart: patient profiles, ER board, agent tools, semantic view and the ER_ASSISTANT agent.';
 
 -- The app role sees GOLD only. Tools run as owner, so it never reads SILVER or the vault directly.
-CREATE ROLE IF NOT EXISTS HEALTHLINE_APP_ROLE COMMENT = 'Healthline web app';
+CREATE ROLE IF NOT EXISTS HEALTHLINE_APP_ROLE COMMENT = 'HealthForce web app';
 GRANT ROLE HEALTHLINE_APP_ROLE TO ROLE ACCOUNTADMIN;
 
 GRANT USAGE ON WAREHOUSE HEALTHLINE_WH TO ROLE HEALTHLINE_APP_ROLE;
@@ -33,5 +33,5 @@ CREATE USER IF NOT EXISTS HEALTHLINE_APP
   TYPE = SERVICE
   DEFAULT_ROLE = HEALTHLINE_APP_ROLE
   DEFAULT_WAREHOUSE = HEALTHLINE_WH
-  COMMENT = 'Healthline web app (key-pair auth)';
+  COMMENT = 'HealthForce web app (key-pair auth)';
 GRANT ROLE HEALTHLINE_APP_ROLE TO USER HEALTHLINE_APP;

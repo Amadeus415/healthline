@@ -1,4 +1,4 @@
--- Healthline gold mart: one wide row per patient, built for fast identification and charting.
+-- HealthForce gold mart: one wide row per patient, built for fast identification and charting.
 --
 -- Sources
 --   CLINICAL_CLAIMS_DV (the team's Data Vault): PATIENT_HK hash keys and organization names.

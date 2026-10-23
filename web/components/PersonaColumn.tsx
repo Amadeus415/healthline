@@ -28,7 +28,6 @@ type Props = {
   running: boolean;
   queued: number;
   inbox: InboxItem[];
-  fresh: boolean;
   empty: { title: string; hint: string; prompt?: string };
   onAck: () => void;
   onSend: (text: string) => void;
@@ -42,8 +41,8 @@ const ago = (at: number) => {
   return s < 60 ? "now" : `${Math.round(s / 60)} min`;
 };
 
-/** One person's view of the shared case: their alerts, their conversation with Healthline, their composer. */
-export function PersonaColumn({ persona, turns, busy, running, queued, inbox, fresh, empty, onAck, onSend, onStop, onChart, children }: Props) {
+/** One person's view of the shared case: their alerts, their conversation with HealthForce, their composer. */
+export function PersonaColumn({ persona, turns, busy, running, queued, inbox, empty, onAck, onSend, onStop, onChart, children }: Props) {
   const composer = useRef<ComposerHandle>(null);
   const [showAll, setShowAll] = useState(false);
   // Only the newest alert takes room; older ones fold away so the conversation keeps the height.
@@ -51,35 +50,24 @@ export function PersonaColumn({ persona, turns, busy, running, queued, inbox, fr
   const visible = showAll ? newestFirst : newestFirst.slice(0, 1);
 
   return (
-    <section
-      onPointerDown={onAck}
-      onFocusCapture={onAck}
-      style={{ "--tint": persona.tint } as React.CSSProperties}
-      className={clsx(
-        "relative flex min-h-0 min-w-0 flex-col border-r border-line transition-shadow duration-500 last:border-r-0",
-        fresh && "shadow-[inset_0_0_0_2px_var(--tint)]",
-      )}
-    >
-      {fresh && <div aria-hidden className="pointer-events-none absolute inset-0 z-10 animate-[ring_1.6s_ease-out_infinite] shadow-[inset_0_0_0_2px_var(--tint)]" />}
-
-      <header className="flex h-[52px] flex-none items-center gap-3 border-b border-line px-4">
-        <div className="grid size-[30px] flex-none place-items-center rounded-full border font-mono text-[11px] tracking-[.04em]" style={{ borderColor: persona.tint, color: persona.tint }}>
+    <section onPointerDown={onAck} onFocusCapture={onAck} className="relative flex h-full min-h-0 min-w-0 flex-col bg-paper">
+      {/* The persona's colour band: the first thing that tells the three phones apart. */}
+      <header className="flex h-[52px] flex-none items-center gap-3 bg-[var(--band)] px-4 text-white">
+        <div className="grid size-[30px] flex-none place-items-center rounded-full border border-white/60 bg-white/10 font-mono text-[11px] tracking-[.04em]">
           {persona.initials}
         </div>
         <div className="min-w-0 leading-tight">
           <div className="flex items-baseline gap-2">
             <span className="text-[15px] font-normal">{persona.name}</span>
-            <span className="label" style={{ color: persona.tint }}>
-              {persona.role}
-            </span>
+            <span className="label text-white/70">{persona.role}</span>
           </div>
-          <div className="truncate text-[12.5px] text-mute">{persona.where}</div>
+          <div className="truncate text-[12.5px] text-white/60">{persona.where}</div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          {queued > 0 && <span className="label rounded-full border border-line px-2 py-1">Queued</span>}
-          {running && <span className="size-1.5 animate-[pulse-dot_1s_infinite] rounded-full" style={{ background: persona.tint }} />}
+          {queued > 0 && <span className="label rounded-full border border-white/30 px-2 py-1 text-white/80">Queued</span>}
+          {running && <span className="size-1.5 animate-[pulse-dot_1s_infinite] rounded-full bg-white" />}
           {onChart && (
-            <button onClick={onChart} title="Patient chart" className="rounded-[9px] p-2 text-mute hover:bg-line hover:text-ink">
+            <button onClick={onChart} title="Patient chart" className="rounded-[9px] p-2 text-white/75 hover:bg-white/15 hover:text-white">
               <UserRound className="size-[18px]" strokeWidth={1.5} />
             </button>
           )}
@@ -98,13 +86,13 @@ export function PersonaColumn({ persona, turns, busy, running, queued, inbox, fr
                   transition={{ duration: 0.5, ease }}
                   className={clsx(
                     "grid gap-0.5 rounded-[12px] border px-3 py-2",
-                    item.priority === "critical" ? "border-accent bg-accent-soft" : "border-line bg-raise",
+                    item.priority === "critical" ? "border-danger bg-danger-soft" : "border-line bg-raise",
                     i > 0 && "opacity-70",
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <BellRing className={clsx("size-3.5 flex-none", item.priority === "critical" ? "text-accent" : "text-mute")} strokeWidth={1.8} />
-                    <span className="label" style={{ color: item.priority === "critical" ? "var(--accent)" : undefined }}>
+                    <BellRing className={clsx("size-3.5 flex-none", item.priority === "critical" ? "text-danger" : "text-accent")} strokeWidth={1.8} />
+                    <span className="label" style={{ color: item.priority === "critical" ? "var(--danger)" : undefined }}>
                       {item.priority} · from {item.from}
                     </span>
                     <span className="ml-auto font-mono text-[10.5px] text-mute">{ago(item.at)}</span>
@@ -133,19 +121,22 @@ export function PersonaColumn({ persona, turns, busy, running, queued, inbox, fr
       {turns.length ? (
         <Thread dense turns={turns} busy={busy} onReply={onSend} />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <Mark className={clsx("size-8", !empty.prompt && "animate-[pulse-dot_2.4s_ease-in-out_infinite]")} />
-          <div className="font-serif text-[26px] leading-tight tracking-[-.01em]">{empty.title}</div>
-          <p className="max-w-[320px] text-[14px] text-mute">{empty.hint}</p>
-          {empty.prompt && (
-            <button
-              onClick={() => onSend(empty.prompt!)}
-              className="group mt-2 grid max-w-[380px] grid-cols-[1fr_auto] items-center gap-4 rounded-[14px] border border-line bg-raise px-4 py-3 text-left text-[14px] leading-snug transition-colors hover:border-edge"
-            >
-              <span>{empty.prompt}</span>
-              <ArrowRight className="size-4 text-mute transition-transform group-hover:translate-x-0.5" style={{ color: persona.tint }} strokeWidth={1.6} />
-            </button>
-          )}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8">
+          {/* m-auto centres when there is room and scrolls from the top when there isn't. */}
+          <div className="m-auto flex flex-col items-center gap-4 py-4 text-center">
+            <Mark className={clsx("size-8", !empty.prompt && "animate-[pulse-dot_2.4s_ease-in-out_infinite]")} />
+            <div className="font-serif text-[26px] leading-tight tracking-[-.01em]">{empty.title}</div>
+            <p className="max-w-[320px] text-[14px] text-mute">{empty.hint}</p>
+            {empty.prompt && (
+              <button
+                onClick={() => onSend(empty.prompt!)}
+                className="group mt-2 grid max-w-[380px] grid-cols-[1fr_auto] items-center gap-4 rounded-[14px] border border-line bg-raise px-4 py-3 text-left text-[14px] leading-snug transition-colors hover:border-edge"
+              >
+                <span>{empty.prompt}</span>
+                <ArrowRight className="size-4 text-accent transition-transform group-hover:translate-x-0.5" strokeWidth={1.6} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

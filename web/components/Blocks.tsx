@@ -100,7 +100,6 @@ export function Candidates({ candidates, ruledOut = [] }: { candidates: Candidat
         return (
           <motion.div
             key={c.patient_id}
-            layout
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: out ? 0.35 : 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 + i * 0.08, ease }}

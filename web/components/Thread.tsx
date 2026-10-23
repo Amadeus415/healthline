@@ -58,9 +58,9 @@ export function Thread({ turns, busy, onReply, dense }: { turns: Turn[]; busy: b
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease }}
-                className="grid gap-1 rounded-[12px] border border-accent bg-accent-soft px-3.5 py-2.5"
+                className="grid gap-1 rounded-[12px] border border-danger bg-danger-soft px-3.5 py-2.5"
               >
-                <span className="label text-accent">Monitor alarm · raised automatically</span>
+                <span className="label text-danger">Monitor alarm · raised automatically</span>
                 <span className="font-mono text-[12.5px] leading-relaxed">{turn.text}</span>
               </motion.div>
             ) : turn.role === "user" ? (
@@ -143,7 +143,7 @@ function AssistantMessage({
       )}
 
       {turn.status === "error" && (
-        <div className="rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-[14px] text-accent">{turn.error}</div>
+        <div className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-[14px] text-danger">{turn.error}</div>
       )}
     </motion.div>
   );

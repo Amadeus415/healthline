@@ -280,7 +280,8 @@ export function parseDirectives(text: string): Directives {
     // While streaming, hide a block that has opened but not closed yet.
     .replace(/```(options|handoff|tasks|catches)[\s\S]*$/, "")
     // The team tags are for the agent; drop one if it echoes it back.
-    .replace(/^\s*\[(Paramedic|Doctor|Nurse|Monitor)[^\]]*\]\s*/i, "")
+    .replace(/^\s*(\*\*|__)?\[(Paramedic|Doctor|Nurse|Monitor)[^\]]*\]\1?\s*/i, "")
+    .replace(/^(Paramedic|Doctor|Dr\. Okafor|Nurse)\s*[:,]\s+/i, "")
     .trim();
   return out;
 }
