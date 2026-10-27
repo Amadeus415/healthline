@@ -8,6 +8,8 @@ A clinician describes what they can see: sex, rough age, height, a pill bottle, 
 Cortex Agent narrows 1.4 million patients to a handful, asks for one bedside check, names the most likely match,
 and opens a chart pulled together from every care site that holds their records.
 
+![Three phones, one agent: the paramedic, the doctor and the nurse on one case](docs/readme/team.png)
+
 ```mermaid
 flowchart LR
     A["🚑 Unknown patient<br/>no ID, can't speak"] --> B["🗣️ Clinician describes<br/>what they see"]
@@ -23,21 +25,20 @@ that history is effectively lost: the team doesn't know about the blood thinner,
 condition until it's too late to matter. HealthForce unifies those records in Snowflake and puts an agent in front
 of them that clinicians can talk to like a colleague.
 
-## How it narrows 1.4 million people to one
+## 1.4 million people to one, in two questions
 
 Every clue becomes a filter. The agent turns vague phrases into ranges ("early 40s" is 39 to 44, "about 177 cm"
-is 172 to 182), runs them in one scan, and shows the funnel so the team can see why it is confident.
+is 172 to 182), runs them in one scan, and draws the funnel so the team can see why it is confident.
 
-```mermaid
-flowchart TD
-    A["1.42M patients"] --> B["361,607<br/>found in Cleveland"]
-    B --> C["11<br/>male, early 40s, ~177 cm,<br/>on nitroglycerin, seen at MetroHealth"]
-    C --> D["3 close candidates<br/>🩺 agent asks: appendectomy scar or insulin sites?"]
-    D -->|"clinician taps 'Neither'"| E["1 likely match: Wally Koelpin<br/>⚠️ clopidogrel (bleeding risk) · metoprolol · ischemic heart disease"]
-```
+*Unconscious male, early 40s, about 177 cm. Nitroglycerin spray and a MetroHealth slip in his jacket. Found in Cleveland.*
 
-When a bedside check would split the candidates, the agent asks for it and waits. When one person clearly leads, it
-skips straight to the chart.
+![The funnel: 361,520 people in Cleveland narrow to 13, then three close candidates and one bedside check](docs/readme/identify.png)
+
+Three candidates are tied, so the agent asks for the one check that separates them. The clinician taps **Neither**,
+two candidates drop out, and the chart opens: clopidogrel (bleeding risk), a beta blocker that can hide shock,
+ischemic heart disease, and the records from three care sites.
+
+![Wally Koelpin's chart, with the bleeding risk and the beta blocker called out first](docs/readme/chart.png)
 
 ## One agent, three phones (`/team`)
 
@@ -55,12 +56,12 @@ sequenceDiagram
     A->>P: Bedside check: appendectomy scar or insulin sites?
     P->>A: Neither
     A-->>D: 🔴 Handoff: likely Wally Koelpin, dual antiplatelets, metoprolol masking shock
-    D->>A: What would I miss? Get the bay ready.
-    A-->>N: 📋 Ready list fills
     Note over P,A: Ambulance monitor: BP drops below 80
     A-->>D: 🔴 Critical handoff, nobody had to ask
+    D->>A: What would I miss? Get the bay ready.
+    A-->>N: 📋 Ready list fills
+    N-->>D: ✅ "Two large-bore IVs" ticked off
     D->>A: Pull the gauze, hang blood
-    A-->>N: ✏️ Gauze struck off, 2 units type-specific red cells added (group looked up, nobody said it)
 ```
 
 Three things make it feel like a teammate rather than a chatbot:
@@ -71,6 +72,8 @@ Three things make it feel like a teammate rather than a chatbot:
   the group came from, plus a fresh type and screen.
 - **It flags what a busy team would miss.** Clinical replies end with up to three bold bullets: drug interactions,
   records held at another care site, tests that don't need repeating.
+
+![The doctor orders "pull off the gauze and hang blood"; the nurse's tick shows up on the doctor's phone](docs/readme/team-blood.png)
 
 Sensitive records stay hidden until a clinician **breaks the glass**, and every access is logged.
 
@@ -157,9 +160,10 @@ pnpm install
 pnpm dev                     # http://localhost:3000
 ```
 
-**Recording the demo.** With the app running, `cd web && node scripts/record-demo.mjs` drives the whole team flow
-in headless Chromium with captions and writes `web/demo-video/healthforce-team-demo.webm`
-(`npx playwright install chromium` once first). Convert for sharing with
+**Screenshots and video.** With the app running, `cd web && node scripts/readme-shots.mjs` retakes the README
+screenshots into `docs/readme/`, and `node scripts/record-demo.mjs` records the team flow with captions to
+`web/demo-video/healthforce-team-demo.webm` (`npx playwright install chromium` once first). Both drive the real
+agent, so the wording varies run to run. Convert the video for sharing with
 `ffmpeg -i healthforce-team-demo.webm -c:v libx264 -pix_fmt yuv420p healthforce-team-demo.mp4`.
 
 </details>
@@ -202,5 +206,6 @@ patient (US frequencies, fixed per patient, stamped on their latest clinical vis
 snowflake/       SQL for setup, gold mart, tools, grants and blood groups, in run order
 cortex_project/  Semantic view and agent specs (deployed with cortex agent-studio)
 scripts/         Service user key pair
+docs/readme/     Screenshots (retake with web/scripts/readme-shots.mjs)
 web/             Next.js 16 app: app/api (agent stream, ER board, break glass, blood type), components, lib
 ```
